@@ -113,6 +113,10 @@ bool Application::InitializeCEF(int argc, char* argv[]) {
     // which should be the build directory when running
     CefString(&settings.locales_dir_path).FromASCII("./locales");
     CefString(&settings.resources_dir_path).FromASCII(".");
+    
+    // Debug: Print current working directory and check for required files
+    std::cout << "Current working directory should contain CEF resources" << std::endl;
+    std::cout << "Looking for icudtl.dat, locales/, etc. in current directory" << std::endl;
 #endif
     
     // Initialize CEF

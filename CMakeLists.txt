@@ -111,7 +111,15 @@ if(UNIX AND NOT APPLE)
     endif()
     
     # Copy required CEF resources
+    message(STATUS "Copying CEF resources from: ${CEF_ROOT}/Resources/")
     file(COPY "${CEF_ROOT}/Resources/" DESTINATION "${CMAKE_BINARY_DIR}/")
+    
+    # Verify icudtl.dat was copied
+    if(NOT EXISTS "${CMAKE_BINARY_DIR}/icudtl.dat")
+        message(WARNING "icudtl.dat not found in build directory after copy")
+    else()
+        message(STATUS "icudtl.dat successfully copied to build directory")
+    endif()
     
     # Copy additional binaries if they exist
     if(EXISTS "${CEF_BINARY_DIR}/chrome-sandbox")
