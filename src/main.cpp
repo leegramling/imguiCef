@@ -43,8 +43,8 @@ private:
     VkSampler m_CefTextureSampler = VK_NULL_HANDLE;
     VkDescriptorSet m_CefDescriptorSet = VK_NULL_HANDLE;
     
-    int m_BrowserWidth = 1024;
-    int m_BrowserHeight = 768;
+    int m_BrowserWidth = 800;
+    int m_BrowserHeight = 600;
     char m_UrlBuffer[256] = "https://www.google.com";
     
     bool InitializeCEF(int argc, char* argv[]);
@@ -227,49 +227,42 @@ void Application::UpdateCefTexture() {
 }
 
 void Application::RenderUI() {
-    ImGui::Begin("Browser Control", nullptr, ImGuiWindowFlags_AlwaysAutoResize);
+    // Single browser window with controls at the top
+    ImGui::Begin("Browser", nullptr, ImGuiWindowFlags_NoCollapse);
     
-    ImGui::InputText("URL", m_UrlBuffer, sizeof(m_UrlBuffer));
+    // URL controls at the top
+    ImGui::Text("URL:");
+    ImGui::SetNextItemWidth(-120); // Leave space for buttons
+    ImGui::InputText("##url", m_UrlBuffer, sizeof(m_UrlBuffer));
     ImGui::SameLine();
     
     if (ImGui::Button("Go") && m_Client->GetBrowser()) {
         m_Client->GetBrowser()->GetMainFrame()->LoadURL(m_UrlBuffer);
     }
     
-    ImGui::SameLine();
+    // Navigation buttons on second row
     if (ImGui::Button("Back") && m_Client->GetBrowser()) {
         m_Client->GetBrowser()->GoBack();
     }
-    
     ImGui::SameLine();
+    
     if (ImGui::Button("Forward") && m_Client->GetBrowser()) {
         m_Client->GetBrowser()->GoForward();
     }
-    
     ImGui::SameLine();
+    
     if (ImGui::Button("Reload") && m_Client->GetBrowser()) {
         m_Client->GetBrowser()->Reload();
     }
     
-    ImGui::End();
+    // Separator between controls and browser view
+    ImGui::Separator();
     
-    // Browser view window
-    ImGui::Begin("Browser View");
-    
-    ImVec2 size = ImGui::GetContentRegionAvail();
-    if (size.x > 0 && size.y > 0 && (size.x != m_BrowserWidth || size.y != m_BrowserHeight)) {
-        m_BrowserWidth = static_cast<int>(size.x);
-        m_BrowserHeight = static_cast<int>(size.y);
-        m_RenderHandler->Resize(m_BrowserWidth, m_BrowserHeight);
-        
-        if (m_Client->GetBrowser()) {
-            m_Client->GetBrowser()->GetHost()->WasResized();
-        }
-    }
-    
+    // Browser view below the controls
     if (m_CefDescriptorSet) {
-        ImVec2 pos = ImGui::GetCursorScreenPos();
+        // Use fixed size for consistent layout
         ImVec2 browser_size = ImVec2((float)m_BrowserWidth, (float)m_BrowserHeight);
+        ImVec2 pos = ImGui::GetCursorScreenPos();
         
         // Display the browser image
         ImGui::Image((ImTextureID)m_CefDescriptorSet, browser_size);
@@ -334,7 +327,9 @@ void Application::RenderUI() {
             }
         }
     } else {
-        ImGui::Text("Browser initializing...");
+        // Show placeholder when browser is not ready
+        ImGui::Text("Browser loading...");
+        ImGui::Dummy(ImVec2((float)m_BrowserWidth, (float)m_BrowserHeight));
     }
     
     ImGui::End();
