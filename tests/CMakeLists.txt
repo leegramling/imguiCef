@@ -6,8 +6,8 @@ enable_testing()
 # Find required packages for testing
 find_package(Threads REQUIRED)
 
-# CEF configuration (reuse from parent)
-set(CEF_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/../cef_binary_105.3.39")
+# CEF configuration (inherited from parent CMakeLists.txt)
+# CEF_ROOT is already set by the parent CMakeLists.txt
 set(CEF_INCLUDE_DIR "${CEF_ROOT}/include")
 set(CEF_LIBCEF_DLL_DIR "${CEF_ROOT}/libcef_dll")
 
