@@ -98,14 +98,21 @@ bool Application::InitializeCEF(int argc, char* argv[]) {
     settings.windowless_rendering_enabled = true;
     settings.no_sandbox = true;
     
+    // Set cache directory to avoid singleton behavior warnings
+    CefString(&settings.root_cache_path).FromASCII("./cef_cache");
+    
+    // Enable logging for debugging
+    settings.log_severity = LOGSEVERITY_INFO;
+    CefString(&settings.log_file).FromASCII("./debug.log");
+    
     // Add command line switches to disable GPU acceleration
     settings.command_line_args_disabled = false;
     
 #if !defined(OS_WIN)
-    // On Linux, we need to set the resource paths using absolute paths
-    std::string build_dir = "/home/lgramling/dev/imguiCef/build";
-    CefString(&settings.locales_dir_path).FromASCII((build_dir + "/locales").c_str());
-    CefString(&settings.resources_dir_path).FromASCII(build_dir.c_str());
+    // On Linux, we need to set the resource paths - use current directory
+    // which should be the build directory when running
+    CefString(&settings.locales_dir_path).FromASCII("./locales");
+    CefString(&settings.resources_dir_path).FromASCII(".");
 #endif
     
     // Initialize CEF
