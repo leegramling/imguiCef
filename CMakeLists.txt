@@ -102,9 +102,13 @@ if(UNIX AND NOT APPLE)
     configure_file("${CEF_BINARY_DIR}/libvulkan.so.1" "${CMAKE_BINARY_DIR}/libvulkan.so.1" COPYONLY)
     configure_file("${CEF_BINARY_DIR}/vk_swiftshader_icd.json" "${CMAKE_BINARY_DIR}/vk_swiftshader_icd.json" COPYONLY)
     
-    # Copy V8 snapshot files
-    configure_file("${CEF_BINARY_DIR}/snapshot_blob.bin" "${CMAKE_BINARY_DIR}/snapshot_blob.bin" COPYONLY)
-    configure_file("${CEF_BINARY_DIR}/v8_context_snapshot.bin" "${CMAKE_BINARY_DIR}/v8_context_snapshot.bin" COPYONLY)
+    # Copy V8 snapshot files (if they exist - newer CEF versions may not have snapshot_blob.bin)
+    if(EXISTS "${CEF_BINARY_DIR}/snapshot_blob.bin")
+        configure_file("${CEF_BINARY_DIR}/snapshot_blob.bin" "${CMAKE_BINARY_DIR}/snapshot_blob.bin" COPYONLY)
+    endif()
+    if(EXISTS "${CEF_BINARY_DIR}/v8_context_snapshot.bin")
+        configure_file("${CEF_BINARY_DIR}/v8_context_snapshot.bin" "${CMAKE_BINARY_DIR}/v8_context_snapshot.bin" COPYONLY)
+    endif()
     
     # Copy required CEF resources
     file(COPY "${CEF_ROOT}/Resources/" DESTINATION "${CMAKE_BINARY_DIR}/")
