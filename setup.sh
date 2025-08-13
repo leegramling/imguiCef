@@ -6,8 +6,8 @@
 set -e  # Exit on any error
 
 # CEF Configuration - Update these variables to use different CEF versions
-CEF_VERSION="105.3.39+g0bb4138+chromium-105.0.5195.127"
-CEF_DIR_NAME="cef_binary_105.3.39"
+CEF_VERSION="133.4.8+g6b4e4fe+chromium-133.0.6877.0"
+CEF_DIR_NAME="cef_binary_133.4.8"
 
 PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$PROJECT_ROOT"

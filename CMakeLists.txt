@@ -26,7 +26,7 @@ set(GLFW_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
 FetchContent_MakeAvailable(glfw)
 
 # CEF paths
-set(CEF_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/cef_binary_105.3.39")
+set(CEF_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/cef_binary_133.4.8")
 set(CEF_INCLUDE_DIR "${CEF_ROOT}/include")
 set(CEF_LIBCEF_DLL_DIR "${CEF_ROOT}/libcef_dll")
 
