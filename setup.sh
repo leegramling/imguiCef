@@ -84,111 +84,95 @@ setup_imgui_submodule() {
     fi
 }
 
-# Function to install system dependencies
-install_system_deps() {
-    echo "=== Installing system dependencies ==="
+# Function to check and install minimal system dependencies
+check_system_deps() {
+    echo "=== Checking minimal system dependencies ==="
     
+    local missing_deps=()
+    
+    # Check for essential build tools
+    if ! command -v gcc >/dev/null 2>&1 && ! command -v clang >/dev/null 2>&1; then
+        missing_deps+=("C++ compiler (gcc or clang)")
+    fi
+    
+    if ! command -v cmake >/dev/null 2>&1; then
+        missing_deps+=("cmake")
+    fi
+    
+    if ! command -v git >/dev/null 2>&1; then
+        missing_deps+=("git")
+    fi
+    
+    # Check for Vulkan SDK
+    if ! command -v vulkaninfo >/dev/null 2>&1; then
+        missing_deps+=("Vulkan SDK")
+    fi
+    
+    # Platform-specific checks
     case "$PLATFORM" in
         "linux64")
-            echo "Installing Linux dependencies..."
-            
-            # Check if we're on a Debian/Ubuntu system
-            if command -v apt-get >/dev/null 2>&1; then
-                sudo apt-get update
-                sudo apt-get install -y \
-                    build-essential \
-                    cmake \
-                    pkg-config \
-                    libglfw3-dev \
-                    libvulkan-dev \
-                    vulkan-tools \
-                    vulkan-validationlayers-dev \
-                    libx11-dev \
-                    libxrandr-dev \
-                    libxinerama-dev \
-                    libxcursor-dev \
-                    libxi-dev \
-                    libnss3-dev \
-                    libatk-bridge2.0-dev \
-                    libgtk-3-dev \
-                    libxss1 \
-                    libasound2-dev
-            
-            # Check if we're on a Red Hat/Fedora system
-            elif command -v dnf >/dev/null 2>&1; then
-                sudo dnf install -y \
-                    gcc-c++ \
-                    cmake \
-                    pkgconfig \
-                    glfw-devel \
-                    vulkan-devel \
-                    vulkan-tools \
-                    vulkan-validation-layers-devel \
-                    libX11-devel \
-                    libXrandr-devel \
-                    libXinerama-devel \
-                    libXcursor-devel \
-                    libXi-devel \
-                    nss-devel \
-                    at-spi2-atk-devel \
-                    gtk3-devel \
-                    libXScrnSaver \
-                    alsa-lib-devel
-            
-            elif command -v pacman >/dev/null 2>&1; then
-                sudo pacman -S --needed \
-                    base-devel \
-                    cmake \
-                    glfw-x11 \
-                    vulkan-devel \
-                    vulkan-tools \
-                    vulkan-validation-layers \
-                    libx11 \
-                    libxrandr \
-                    libxinerama \
-                    libxcursor \
-                    libxi \
-                    nss \
-                    at-spi2-atk \
-                    gtk3 \
-                    libxss \
-                    alsa-lib
-            else
-                echo "Warning: Unsupported Linux distribution. Please install dependencies manually:"
-                echo "- Build tools (gcc, cmake, pkg-config)"
-                echo "- GLFW3 development libraries"
-                echo "- Vulkan SDK and validation layers"
-                echo "- X11 development libraries"
-                echo "- CEF runtime dependencies (NSS, GTK3, ALSA, etc.)"
+            # Check for X11 development headers (minimal requirement)
+            if ! pkg-config --exists x11 2>/dev/null; then
+                missing_deps+=("X11 development libraries")
             fi
             ;;
-            
         "macosx64")
-            echo "Installing macOS dependencies..."
-            
-            if command -v brew >/dev/null 2>&1; then
-                brew install cmake glfw vulkan-headers vulkan-loader molten-vk
-                echo "Note: Make sure you have Xcode command line tools installed:"
-                echo "xcode-select --install"
-            else
-                echo "Error: Homebrew not found. Please install Homebrew first:"
-                echo "https://brew.sh"
-                exit 1
+            if ! command -v xcode-select >/dev/null 2>&1; then
+                missing_deps+=("Xcode command line tools")
             fi
-            ;;
-            
-        "windows64")
-            echo "Windows setup detected."
-            echo "Please install the following manually:"
-            echo "1. Visual Studio 2019/2022 with C++ support"
-            echo "2. CMake (https://cmake.org/download/)"
-            echo "3. Vulkan SDK (https://vulkan.lunarg.com/)"
-            echo "4. Git for Windows (if not already installed)"
-            echo ""
-            echo "GLFW and other dependencies will be handled by vcpkg or manual download."
-            echo "Consider using vcpkg for dependency management on Windows."
             ;;
     esac
+    
+    if [ ${#missing_deps[@]} -eq 0 ]; then
+        echo "✓ All essential dependencies are available"
+        return 0
+    else
+        echo "✗ Missing dependencies detected:"
+        printf "  - %s\n" "${missing_deps[@]}"
+        echo ""
+        
+        case "$PLATFORM" in
+            "linux64")
+                echo "To install missing dependencies:"
+                echo ""
+                if command -v apt-get >/dev/null 2>&1; then
+                    echo "  sudo apt-get update"
+                    echo "  sudo apt-get install build-essential cmake git vulkan-tools libx11-dev"
+                elif command -v dnf >/dev/null 2>&1; then
+                    echo "  sudo dnf install gcc-c++ cmake git vulkan-tools libX11-devel"
+                elif command -v pacman >/dev/null 2>&1; then
+                    echo "  sudo pacman -S base-devel cmake git vulkan-tools libx11"
+                else
+                    echo "  Install the missing packages using your distribution's package manager"
+                fi
+                ;;
+            "macosx64")
+                echo "To install missing dependencies:"
+                echo "  brew install cmake vulkan-headers vulkan-loader molten-vk"
+                echo "  xcode-select --install"
+                ;;
+            "windows64")
+                echo "Please install:"
+                echo "  - Visual Studio with C++ support"
+                echo "  - CMake"
+                echo "  - Vulkan SDK"
+                echo "  - Git for Windows"
+                ;;
+        esac
+        
+        echo ""
+        echo "Note: This project now manages most dependencies automatically:"
+        echo "  - GLFW: Downloaded and built by CMake"
+        echo "  - ImGui: Git submodule"
+        echo "  - CEF: Downloaded by this script"
+        echo ""
+        
+        read -p "Continue anyway? [y/N] " -n 1 -r
+        echo
+        if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+            exit 1
+        fi
+    fi
 }
 
 # Function to create build directory and configure
@@ -297,10 +281,20 @@ main() {
             --help|-h)
                 echo "Usage: $0 [options]"
                 echo ""
+                echo "This script sets up the ImGuiCef project with minimal system dependencies."
+                echo "Most dependencies (GLFW, ImGui) are managed automatically by CMake."
+                echo ""
                 echo "Options:"
-                echo "  --skip-deps    Skip system dependency installation"
+                echo "  --skip-deps    Skip system dependency checking"
                 echo "  --skip-build   Skip building the project"
                 echo "  --help, -h     Show this help message"
+                echo ""
+                echo "Minimal system requirements:"
+                echo "  - C++ compiler (gcc/clang/MSVC)"
+                echo "  - CMake 3.20+"
+                echo "  - Git"
+                echo "  - Vulkan SDK"
+                echo "  - X11 development libraries (Linux only)"
                 exit 0
                 ;;
         esac
@@ -308,7 +302,7 @@ main() {
     
     # Run setup steps
     if [ "$SKIP_DEPS" = false ]; then
-        install_system_deps
+        check_system_deps
     fi
     
     download_cef

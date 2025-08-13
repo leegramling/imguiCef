@@ -4,10 +4,26 @@ project(ImGuiCefVulkan VERSION 1.0.0 LANGUAGES C CXX)
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-# Find packages
+# Include FetchContent module for dependency management
+include(FetchContent)
+
+# Find system packages that cannot be fetched
 find_package(Vulkan REQUIRED)
-find_package(glfw3 REQUIRED)
 find_package(Threads REQUIRED)
+
+# Fetch GLFW instead of requiring system installation
+FetchContent_Declare(
+    glfw
+    GIT_REPOSITORY https://github.com/glfw/glfw.git
+    GIT_TAG        3.3.8
+)
+
+# Configure GLFW options before fetching
+set(GLFW_BUILD_DOCS OFF CACHE BOOL "" FORCE)
+set(GLFW_BUILD_TESTS OFF CACHE BOOL "" FORCE)
+set(GLFW_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
+
+FetchContent_MakeAvailable(glfw)
 
 # CEF paths
 set(CEF_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/cef_binary_105.3.39")
