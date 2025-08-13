@@ -5,6 +5,10 @@
 
 set -e  # Exit on any error
 
+# CEF Configuration - Update these variables to use different CEF versions
+CEF_VERSION="105.3.39+g0bb4138+chromium-105.0.5195.127"
+CEF_DIR_NAME="cef_binary_105.3.39"
+
 PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$PROJECT_ROOT"
 
@@ -28,9 +32,6 @@ fi
 
 echo "Detected platform: $PLATFORM"
 
-# CEF version - you can update this to use newer versions
-CEF_VERSION="105.3.39+g0bb4138+chromium-105.0.5195.127"
-CEF_DIR_NAME="cef_binary_105.3.39"
 
 # Function to download and extract CEF
 download_cef() {
