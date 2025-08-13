@@ -1,0 +1,415 @@
+#!/bin/bash
+
+# Windows-specific setup script for ImGuiCef project
+# Designed to run in Git Bash, WSL, or MSYS2
+# Uses Microsoft Visual Studio compiler
+
+set -e  # Exit on any error
+
+PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+cd "$PROJECT_ROOT"
+
+echo "=== ImGuiCef Windows Setup ==="
+echo "Project root: $PROJECT_ROOT"
+
+# CEF version configuration
+CEF_VERSION="105.3.39+g0bb4138+chromium-105.0.5195.127"
+CEF_DIR_NAME="cef_binary_105.3.39"
+CEF_PLATFORM="windows64"
+
+# Detect Windows environment
+detect_environment() {
+    if [[ "$OSTYPE" == "msys" ]]; then
+        WINDOWS_ENV="MSYS2"
+        echo "Detected environment: MSYS2"
+    elif [[ -n "$WSL_DISTRO_NAME" ]]; then
+        WINDOWS_ENV="WSL"
+        echo "Detected environment: WSL"
+        echo "Warning: This script is designed for Windows. Consider using setup.sh for Linux in WSL."
+    elif [[ "$OSTYPE" == "cygwin" ]]; then
+        WINDOWS_ENV="Cygwin"
+        echo "Detected environment: Cygwin"
+    else
+        WINDOWS_ENV="Git_Bash"
+        echo "Detected environment: Git Bash (assumed)"
+    fi
+}
+
+# Function to check if Visual Studio is installed
+check_visual_studio() {
+    echo "=== Checking Visual Studio Installation ==="
+    
+    local vs_found=false
+    local vs_version=""
+    local vs_path=""
+    
+    # Check for VS 2022
+    if [ -d "/c/Program Files/Microsoft Visual Studio/2022" ]; then
+        if [ -d "/c/Program Files/Microsoft Visual Studio/2022/Professional" ]; then
+            vs_path="/c/Program Files/Microsoft Visual Studio/2022/Professional"
+            vs_version="2022 Professional"
+            vs_found=true
+        elif [ -d "/c/Program Files/Microsoft Visual Studio/2022/Community" ]; then
+            vs_path="/c/Program Files/Microsoft Visual Studio/2022/Community"
+            vs_version="2022 Community"
+            vs_found=true
+        elif [ -d "/c/Program Files/Microsoft Visual Studio/2022/Enterprise" ]; then
+            vs_path="/c/Program Files/Microsoft Visual Studio/2022/Enterprise"
+            vs_version="2022 Enterprise"
+            vs_found=true
+        fi
+    fi
+    
+    # Check for VS 2019 if 2022 not found
+    if [ "$vs_found" = false ] && [ -d "/c/Program Files (x86)/Microsoft Visual Studio/2019" ]; then
+        if [ -d "/c/Program Files (x86)/Microsoft Visual Studio/2019/Professional" ]; then
+            vs_path="/c/Program Files (x86)/Microsoft Visual Studio/2019/Professional"
+            vs_version="2019 Professional"
+            vs_found=true
+        elif [ -d "/c/Program Files (x86)/Microsoft Visual Studio/2019/Community" ]; then
+            vs_path="/c/Program Files (x86)/Microsoft Visual Studio/2019/Community"
+            vs_version="2019 Community"
+            vs_found=true
+        elif [ -d "/c/Program Files (x86)/Microsoft Visual Studio/2019/Enterprise" ]; then
+            vs_path="/c/Program Files (x86)/Microsoft Visual Studio/2019/Enterprise"
+            vs_version="2019 Enterprise"
+            vs_found=true
+        fi
+    fi
+    
+    if [ "$vs_found" = true ]; then
+        echo "✓ Found Visual Studio $vs_version"
+        echo "  Path: $vs_path"
+        VS_PATH="$vs_path"
+        VS_VERSION="$vs_version"
+    else
+        echo "✗ Visual Studio not found!"
+        echo ""
+        echo "Please install one of the following:"
+        echo "  - Visual Studio 2022 Community (free): https://visualstudio.microsoft.com/vs/community/"
+        echo "  - Visual Studio 2019 Community (free): https://visualstudio.microsoft.com/vs/older-downloads/"
+        echo ""
+        echo "Make sure to include 'Desktop development with C++' workload."
+        exit 1
+    fi
+}
+
+# Function to check CMake
+check_cmake() {
+    echo "=== Checking CMake Installation ==="
+    
+    if command -v cmake >/dev/null 2>&1; then
+        local cmake_version=$(cmake --version | head -n1 | cut -d' ' -f3)
+        echo "✓ CMake found: version $cmake_version"
+    else
+        echo "✗ CMake not found!"
+        echo ""
+        echo "Please install CMake:"
+        echo "  Option 1: Download from https://cmake.org/download/"
+        echo "  Option 2: Install via Chocolatey: choco install cmake"
+        echo "  Option 3: Install via winget: winget install Kitware.CMake"
+        echo ""
+        echo "Make sure cmake.exe is in your PATH."
+        exit 1
+    fi
+}
+
+# Function to download and extract CEF
+download_cef() {
+    echo "=== Downloading CEF for Windows ==="
+    
+    local cef_filename="cef_binary_${CEF_VERSION}_${CEF_PLATFORM}.tar.bz2"
+    local cef_url="https://cef-builds.spotifycdn.com/${cef_filename}"
+    
+    if [ ! -d "$CEF_DIR_NAME" ]; then
+        echo "Downloading CEF from: $cef_url"
+        
+        # Use curl (should be available in Git Bash) or wget
+        if command -v curl >/dev/null 2>&1; then
+            curl -L -o "$cef_filename" "$cef_url" --progress-bar
+        elif command -v wget >/dev/null 2>&1; then
+            wget --progress=bar:force -O "$cef_filename" "$cef_url"
+        else
+            echo "Error: Neither curl nor wget found."
+            echo "Please install Git for Windows which includes curl."
+            exit 1
+        fi
+        
+        echo "Extracting CEF..."
+        
+        # Try different extraction methods
+        if command -v tar >/dev/null 2>&1; then
+            tar -xjf "$cef_filename"
+        else
+            echo "Error: tar not found. Please install Git for Windows or 7-Zip."
+            exit 1
+        fi
+        
+        # Clean up downloaded file
+        rm "$cef_filename"
+        
+        # Rename to standard directory name if needed
+        if [ -d "cef_binary_${CEF_VERSION}_${CEF_PLATFORM}" ]; then
+            mv "cef_binary_${CEF_VERSION}_${CEF_PLATFORM}" "$CEF_DIR_NAME"
+        fi
+        
+        echo "✓ CEF downloaded and extracted to $CEF_DIR_NAME"
+    else
+        echo "✓ CEF already exists at $CEF_DIR_NAME"
+    fi
+}
+
+# Function to download ImGui
+download_imgui() {
+    echo "=== Setting up ImGui ==="
+    
+    if [ ! -d "imgui" ]; then
+        echo "Cloning ImGui repository..."
+        git clone https://github.com/ocornut/imgui.git imgui
+        echo "✓ ImGui cloned successfully"
+    else
+        echo "✓ ImGui already exists"
+        echo "Updating ImGui..."
+        cd imgui
+        git pull origin master
+        cd ..
+    fi
+}
+
+# Function to setup Visual Studio environment
+setup_vs_environment() {
+    echo "=== Setting up Visual Studio Environment ==="
+    
+    # Find vcvars64.bat
+    local vcvars_path="$VS_PATH/VC/Auxiliary/Build/vcvars64.bat"
+    
+    if [ -f "$vcvars_path" ]; then
+        echo "✓ Found vcvars64.bat at: $vcvars_path"
+        
+        # Convert to Windows path for batch file
+        VCVARS_WIN_PATH=$(echo "$vcvars_path" | sed 's|^/c/|C:/|' | sed 's|/|\\|g')
+        echo "  Windows path: $VCVARS_WIN_PATH"
+    else
+        echo "✗ vcvars64.bat not found at expected location"
+        echo "  Expected: $vcvars_path"
+        exit 1
+    fi
+}
+
+# Function to create Windows batch files for building
+create_build_scripts() {
+    echo "=== Creating Build Scripts ==="
+    
+    # Create build.bat
+    cat > build.bat << 'EOF'
+@echo off
+echo Setting up Visual Studio environment...
+call "%VCVARS_PATH%"
+
+echo Creating build directory...
+if not exist build mkdir build
+cd build
+
+echo Configuring with CMake...
+cmake .. -G "Visual Studio 17 2022" -A x64 || cmake .. -G "Visual Studio 16 2019" -A x64
+
+if %ERRORLEVEL% neq 0 (
+    echo CMake configuration failed!
+    pause
+    exit /b 1
+)
+
+echo Configuration complete. You can now build with:
+echo   cmake --build . --config Debug
+echo   cmake --build . --config Release
+pause
+EOF
+    
+    # Set the vcvars path in the batch file
+    sed -i "s|%VCVARS_PATH%|$VCVARS_WIN_PATH|g" build.bat
+    
+    # Create build-and-run.bat
+    cat > build-and-run.bat << 'EOF'
+@echo off
+echo Setting up Visual Studio environment...
+call "%VCVARS_PATH%"
+
+cd build
+
+echo Building Debug configuration...
+cmake --build . --config Debug
+
+if %ERRORLEVEL% neq 0 (
+    echo Build failed!
+    pause
+    exit /b 1
+)
+
+echo Build successful! Running application...
+Debug\ImGuiCefVulkan.exe
+
+pause
+EOF
+    
+    # Set the vcvars path in the batch file
+    sed -i "s|%VCVARS_PATH%|$VCVARS_WIN_PATH|g" build-and-run.bat
+    
+    echo "✓ Created build.bat and build-and-run.bat"
+}
+
+# Function to configure CMake
+configure_cmake() {
+    echo "=== Configuring CMake ==="
+    
+    mkdir -p build
+    cd build
+    
+    # Try VS 2022 first, then VS 2019
+    echo "Attempting CMake configuration..."
+    
+    if [[ "$VS_VERSION" == *"2022"* ]]; then
+        if cmake .. -G "Visual Studio 17 2022" -A x64; then
+            echo "✓ CMake configured successfully with Visual Studio 2022"
+        else
+            echo "✗ CMake configuration failed"
+            cd ..
+            return 1
+        fi
+    else
+        if cmake .. -G "Visual Studio 16 2019" -A x64; then
+            echo "✓ CMake configured successfully with Visual Studio 2019"
+        else
+            echo "✗ CMake configuration failed"
+            cd ..
+            return 1
+        fi
+    fi
+    
+    cd ..
+    return 0
+}
+
+# Function to verify installation
+verify_setup() {
+    echo "=== Verifying Setup ==="
+    
+    local errors=0
+    
+    # Check CEF
+    if [ -d "$CEF_DIR_NAME" ] && [ -f "$CEF_DIR_NAME/include/cef_version.h" ]; then
+        echo "✓ CEF is properly installed"
+    else
+        echo "✗ CEF installation issue"
+        errors=$((errors + 1))
+    fi
+    
+    # Check ImGui
+    if [ -d "imgui" ] && [ -f "imgui/imgui.h" ]; then
+        echo "✓ ImGui is properly installed"
+    else
+        echo "✗ ImGui installation issue"
+        errors=$((errors + 1))
+    fi
+    
+    # Check build directory
+    if [ -d "build" ] && [ -f "build/ImGuiCefVulkan.sln" ]; then
+        echo "✓ Visual Studio solution created"
+    else
+        echo "✗ Visual Studio solution missing"
+        errors=$((errors + 1))
+    fi
+    
+    # Check batch files
+    if [ -f "build.bat" ] && [ -f "build-and-run.bat" ]; then
+        echo "✓ Build scripts created"
+    else
+        echo "✗ Build scripts missing"
+        errors=$((errors + 1))
+    fi
+    
+    if [ $errors -eq 0 ]; then
+        echo ""
+        echo "🎉 Windows setup completed successfully!"
+        echo ""
+        echo "Next steps:"
+        echo "1. Open Visual Studio solution:"
+        echo "   start build/ImGuiCefVulkan.sln"
+        echo ""
+        echo "2. Or build from command line:"
+        echo "   build.bat                    # Configure only"
+        echo "   build-and-run.bat           # Build and run"
+        echo ""
+        echo "3. Or use CMake directly:"
+        echo "   cd build"
+        echo "   cmake --build . --config Debug"
+        echo "   Debug\\ImGuiCefVulkan.exe"
+        echo ""
+        echo "Make sure you have Vulkan SDK installed for graphics support:"
+        echo "https://vulkan.lunarg.com/sdk/home#windows"
+    else
+        echo "✗ Setup completed with $errors error(s)"
+        exit 1
+    fi
+}
+
+# Main execution
+main() {
+    echo "Starting Windows-specific setup..."
+    
+    # Parse command line arguments
+    SKIP_CHECK=false
+    SKIP_BUILD=false
+    
+    for arg in "$@"; do
+        case $arg in
+            --skip-check)
+                SKIP_CHECK=true
+                shift
+                ;;
+            --skip-build)
+                SKIP_BUILD=true
+                shift
+                ;;
+            --help|-h)
+                echo "Usage: $0 [options]"
+                echo ""
+                echo "Options:"
+                echo "  --skip-check   Skip Visual Studio and CMake checks"
+                echo "  --skip-build   Skip CMake configuration"
+                echo "  --help, -h     Show this help message"
+                echo ""
+                echo "Requirements:"
+                echo "  - Visual Studio 2019 or 2022 with C++ support"
+                echo "  - CMake 3.20 or later"
+                echo "  - Git for Windows (for curl and tar)"
+                echo "  - Vulkan SDK (recommended)"
+                exit 0
+                ;;
+        esac
+    done
+    
+    # Run setup steps
+    detect_environment
+    
+    if [ "$SKIP_CHECK" = false ]; then
+        check_visual_studio
+        check_cmake
+    fi
+    
+    download_cef
+    download_imgui
+    
+    if [ "$SKIP_CHECK" = false ]; then
+        setup_vs_environment
+        create_build_scripts
+    fi
+    
+    if [ "$SKIP_BUILD" = false ]; then
+        configure_cmake
+    fi
+    
+    verify_setup
+}
+
+# Run main function with all arguments
+main "$@"
