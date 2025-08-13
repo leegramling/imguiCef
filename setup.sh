@@ -66,20 +66,20 @@ download_cef() {
     fi
 }
 
-# Function to download ImGui
-download_imgui() {
-    echo "=== Setting up ImGui ==="
+# Function to setup ImGui submodule
+setup_imgui_submodule() {
+    echo "=== Setting up ImGui submodule ==="
     
-    if [ ! -d "imgui" ]; then
-        echo "Cloning ImGui repository..."
-        git clone https://github.com/ocornut/imgui.git imgui
-        echo "ImGui cloned successfully"
+    # Initialize and update git submodules
+    if [ ! -f "imgui/.git" ] && [ ! -d "imgui/.git" ]; then
+        echo "Initializing and updating git submodules..."
+        git submodule update --init --recursive
+        echo "ImGui submodule initialized successfully"
     else
-        echo "ImGui already exists"
-        echo "Updating ImGui..."
-        cd imgui
-        git pull origin master
-        cd ..
+        echo "ImGui submodule already initialized"
+        echo "Updating ImGui submodule..."
+        git submodule update --remote imgui
+        echo "ImGui submodule updated successfully"
     fi
 }
 
@@ -311,7 +311,7 @@ main() {
     fi
     
     download_cef
-    download_imgui
+    setup_imgui_submodule
     setup_build
     
     if [ "$SKIP_BUILD" = false ]; then
