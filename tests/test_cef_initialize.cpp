@@ -2,6 +2,11 @@
 #include <cassert>
 #include <chrono>
 #include <thread>
+
+#ifdef _WIN32
+#include <windows.h>
+#endif
+
 #include "include/cef_app.h"
 #include "include/cef_client.h"
 #include "include/wrapper/cef_helpers.h"
@@ -39,7 +44,11 @@ int main(int argc, char* argv[]) {
     std::cout << "Starting CEF initialization test..." << std::endl;
 
     // Provide CEF with command-line arguments
+#ifdef _WIN32
+    CefMainArgs main_args(GetModuleHandle(nullptr));
+#else
     CefMainArgs main_args(argc, argv);
+#endif
 
     // CEF applications have multiple sub-processes (render, plugin, GPU, etc)
     // This function checks the command-line and, if this is a sub-process, executes the appropriate logic
