@@ -174,44 +174,34 @@ elseif(WIN32)
         message(STATUS "CEF sandbox disabled for easier development")
     endif()
     
-    # Copy CEF DLLs from the appropriate directory
-    if(EXISTS "${CEF_BINARY_DIR}/libcef.dll")
-        configure_file("${CEF_BINARY_DIR}/libcef.dll" "${CMAKE_BINARY_DIR}/libcef.dll" COPYONLY)
-    endif()
+    # Use POST_BUILD commands to copy files to the correct output directory
+    # This ensures files go to Debug/ or Release/ subdirectory on Windows
+    set(CEF_COPY_FILES
+        "${CEF_BINARY_DIR}/libcef.dll"
+    )
     
-    # Copy all DLLs from CEF binary directory
+    # Add all DLLs from CEF binary directory
     file(GLOB CEF_DLLS "${CEF_BINARY_DIR}/*.dll")
-    foreach(DLL ${CEF_DLLS})
-        get_filename_component(DLL_NAME ${DLL} NAME)
-        configure_file(${DLL} "${CMAKE_BINARY_DIR}/${DLL_NAME}" COPYONLY)
-        message(STATUS "Copying CEF DLL: ${DLL_NAME}")
-    endforeach()
+    list(APPEND CEF_COPY_FILES ${CEF_DLLS})
     
-    # Copy additional Windows-specific CEF files
+    # Add additional Windows-specific CEF files
     set(CEF_ADDITIONAL_FILES
         "d3dcompiler_47.dll"
         "libEGL.dll" 
         "libGLESv2.dll"
         "vulkan-1.dll"
         "vk_swiftshader_icd.json"
+        "snapshot_blob.bin"
+        "v8_context_snapshot.bin"
     )
     
     foreach(FILE ${CEF_ADDITIONAL_FILES})
         if(EXISTS "${CEF_BINARY_DIR}/${FILE}")
-            configure_file("${CEF_BINARY_DIR}/${FILE}" "${CMAKE_BINARY_DIR}/${FILE}" COPYONLY)
-            message(STATUS "Copying additional CEF file: ${FILE}")
+            list(APPEND CEF_COPY_FILES "${CEF_BINARY_DIR}/${FILE}")
         endif()
     endforeach()
     
-    # Copy V8 snapshot files (if they exist)
-    if(EXISTS "${CEF_BINARY_DIR}/snapshot_blob.bin")
-        configure_file("${CEF_BINARY_DIR}/snapshot_blob.bin" "${CMAKE_BINARY_DIR}/snapshot_blob.bin" COPYONLY)
-    endif()
-    if(EXISTS "${CEF_BINARY_DIR}/v8_context_snapshot.bin")
-        configure_file("${CEF_BINARY_DIR}/v8_context_snapshot.bin" "${CMAKE_BINARY_DIR}/v8_context_snapshot.bin" COPYONLY)
-    endif()
-    
-    # Copy CEF resources
+    # Copy CEF resources to build directory (these can stay in root)
     message(STATUS "Copying CEF resources from: ${CEF_ROOT}/Resources/")
     file(COPY "${CEF_ROOT}/Resources/" DESTINATION "${CMAKE_BINARY_DIR}/")
     
@@ -289,6 +279,48 @@ if(UNIX AND NOT APPLE)
         INSTALL_RPATH "$ORIGIN"
         BUILD_WITH_INSTALL_RPATH TRUE
     )
+endif()
+
+# Windows-specific POST_BUILD commands to copy CEF files to executable directory
+if(WIN32 AND DEFINED CEF_COPY_FILES)
+    foreach(FILE ${CEF_COPY_FILES})
+        if(EXISTS "${FILE}")
+            get_filename_component(FILE_NAME ${FILE} NAME)
+            add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
+                COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                "${FILE}"
+                "$<TARGET_FILE_DIR:${PROJECT_NAME}>/${FILE_NAME}"
+                COMMENT "Copying ${FILE_NAME} to executable directory"
+            )
+        endif()
+    endforeach()
+    
+    # Copy CEF resources to executable directory as well
+    add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_directory
+        "${CMAKE_BINARY_DIR}/locales"
+        "$<TARGET_FILE_DIR:${PROJECT_NAME}>/locales"
+        COMMENT "Copying locales directory to executable directory"
+    )
+    
+    # Copy essential resource files to executable directory
+    set(CEF_RESOURCE_FILES
+        "icudtl.dat"
+        "chrome_100_percent.pak"
+        "chrome_200_percent.pak"
+        "resources.pak"
+    )
+    
+    foreach(RESOURCE ${CEF_RESOURCE_FILES})
+        if(EXISTS "${CMAKE_BINARY_DIR}/${RESOURCE}")
+            add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
+                COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                "${CMAKE_BINARY_DIR}/${RESOURCE}"
+                "$<TARGET_FILE_DIR:${PROJECT_NAME}>/${RESOURCE}"
+                COMMENT "Copying ${RESOURCE} to executable directory"
+            )
+        endif()
+    endforeach()
 endif()
 
 # On Linux, set executable permissions for chrome-sandbox if it exists

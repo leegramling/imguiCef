@@ -116,11 +116,20 @@ After building, the executable will be in:
 
 ### Running
 ```cmd
+# For Visual Studio builds (Debug/Release configurations)
+cd build/Debug
+ImGuiCefVulkan.exe
+
+# Or for Release builds
+cd build/Release
+ImGuiCefVulkan.exe
+
+# For single-config generators (Ninja, Makefiles)
 cd build
 ImGuiCefVulkan.exe
 ```
 
-**Important**: Must run from the `build` directory for proper CEF resource loading.
+**Important**: All required CEF libraries and resources are automatically copied to the executable's directory during build, so you can run directly from the executable's location.
 
 ## Testing on Windows
 
@@ -161,7 +170,7 @@ test_cef_initialize.exe
    - Try updating to latest Visual Studio version
 
 ### Verification Steps
-After successful build, the build directory should contain:
+After successful build, the executable's directory (`build/Debug/` or `build/Release/`) should contain:
 
 **Executable:**
 - `ImGuiCefVulkan.exe`
@@ -186,6 +195,8 @@ After successful build, the build directory should contain:
 
 **Configuration Files:**
 - `vk_swiftshader_icd.json` - Vulkan Swiftshader configuration
+
+**Note**: All files are automatically copied to the same directory as the executable via POST_BUILD commands.
 
 ## Architecture Notes
 
