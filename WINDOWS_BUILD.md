@@ -162,10 +162,30 @@ test_cef_initialize.exe
 
 ### Verification Steps
 After successful build, the build directory should contain:
+
+**Executable:**
 - `ImGuiCefVulkan.exe`
-- `libcef.dll` and other CEF DLLs
-- `icudtl.dat` and other CEF resources
-- V8 snapshot files (if present in CEF distribution)
+
+**Core CEF Libraries:**
+- `libcef.dll` - Main CEF library
+- `d3dcompiler_47.dll` - DirectX shader compiler  
+- `libEGL.dll` - OpenGL ES implementation
+- `libGLESv2.dll` - OpenGL ES v2 implementation
+- `vulkan-1.dll` - Vulkan loader (if present)
+
+**CEF Resources:**
+- `icudtl.dat` - ICU internationalization data
+- `chrome_100_percent.pak` - UI resources (100% scale)
+- `chrome_200_percent.pak` - UI resources (200% scale) 
+- `resources.pak` - Main resource bundle
+- `locales/` directory - Language pack files (*.pak)
+
+**V8 Engine Files (if present):**
+- `snapshot_blob.bin` - V8 JavaScript engine snapshot
+- `v8_context_snapshot.bin` - V8 context snapshot
+
+**Configuration Files:**
+- `vk_swiftshader_icd.json` - Vulkan Swiftshader configuration
 
 ## Architecture Notes
 

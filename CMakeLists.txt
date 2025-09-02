@@ -184,6 +184,23 @@ elseif(WIN32)
     foreach(DLL ${CEF_DLLS})
         get_filename_component(DLL_NAME ${DLL} NAME)
         configure_file(${DLL} "${CMAKE_BINARY_DIR}/${DLL_NAME}" COPYONLY)
+        message(STATUS "Copying CEF DLL: ${DLL_NAME}")
+    endforeach()
+    
+    # Copy additional Windows-specific CEF files
+    set(CEF_ADDITIONAL_FILES
+        "d3dcompiler_47.dll"
+        "libEGL.dll" 
+        "libGLESv2.dll"
+        "vulkan-1.dll"
+        "vk_swiftshader_icd.json"
+    )
+    
+    foreach(FILE ${CEF_ADDITIONAL_FILES})
+        if(EXISTS "${CEF_BINARY_DIR}/${FILE}")
+            configure_file("${CEF_BINARY_DIR}/${FILE}" "${CMAKE_BINARY_DIR}/${FILE}" COPYONLY)
+            message(STATUS "Copying additional CEF file: ${FILE}")
+        endif()
     endforeach()
     
     # Copy V8 snapshot files (if they exist)
