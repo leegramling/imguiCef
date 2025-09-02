@@ -6,6 +6,10 @@
 #include <thread>
 #include <chrono>
 
+#ifdef _WIN32
+#include <windows.h>
+#endif
+
 #define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
 
@@ -84,7 +88,11 @@ bool Application::Initialize(int argc, char* argv[]) {
 }
 
 bool Application::InitializeCEF(int argc, char* argv[]) {
+#ifdef _WIN32
+    CefMainArgs main_args(GetModuleHandle(nullptr));
+#else
     CefMainArgs main_args(argc, argv);
+#endif
     m_CefApp = new CefAppImpl();
     
     // Execute the sub-process if applicable
