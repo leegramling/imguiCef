@@ -16,8 +16,19 @@ if(UNIX AND NOT APPLE)
     set(CEF_BINARY_DIR "${CEF_ROOT}/Release")
     set(CEF_LIBRARIES "${CEF_BINARY_DIR}/libcef.so")
 elseif(WIN32)
-    set(CEF_BINARY_DIR "${CEF_ROOT}/Release")
-    set(CEF_LIBRARIES "${CEF_BINARY_DIR}/libcef.lib")
+    # Windows - Set binary directory based on build configuration
+    if(CMAKE_BUILD_TYPE STREQUAL "Debug")
+        set(CEF_BINARY_DIR "${CEF_ROOT}/Debug")
+        set(CEF_SANDBOX_LIB "${CEF_ROOT}/Debug/cef_sandbox.lib")
+    else()
+        set(CEF_BINARY_DIR "${CEF_ROOT}/Release")
+        set(CEF_SANDBOX_LIB "${CEF_ROOT}/Release/cef_sandbox.lib")
+    endif()
+    
+    set(CEF_LIBRARIES
+        "${CEF_BINARY_DIR}/libcef.lib"
+        "${CEF_SANDBOX_LIB}"
+    )
 endif()
 
 # Test sources
@@ -39,8 +50,12 @@ target_link_libraries(test_cef_initialize PRIVATE
     cef_dll_wrapper
     ${CEF_LIBRARIES}
     Threads::Threads
-    dl
 )
+
+# Platform-specific libraries
+if(UNIX AND NOT APPLE)
+    target_link_libraries(test_cef_initialize PRIVATE dl)
+endif()
 
 # Compile definitions
 target_compile_definitions(test_cef_initialize PRIVATE
@@ -60,6 +75,14 @@ endif()
 add_test(NAME CEFInitializeTest COMMAND test_cef_initialize)
 
 # Set environment variables for test
-set_tests_properties(CEFInitializeTest PROPERTIES
-    ENVIRONMENT "LD_LIBRARY_PATH=${CMAKE_BINARY_DIR}:$ENV{LD_LIBRARY_PATH}"
-)
+if(UNIX AND NOT APPLE)
+    # Linux: Use LD_LIBRARY_PATH
+    set_tests_properties(CEFInitializeTest PROPERTIES
+        ENVIRONMENT "LD_LIBRARY_PATH=${CMAKE_BINARY_DIR}:$ENV{LD_LIBRARY_PATH}"
+    )
+elseif(WIN32)
+    # Windows: Use PATH
+    set_tests_properties(CEFInitializeTest PROPERTIES
+        ENVIRONMENT "PATH=${CMAKE_BINARY_DIR};$ENV{PATH}"
+    )
+endif()

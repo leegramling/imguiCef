@@ -86,6 +86,25 @@ target_compile_definitions(cef_dll_wrapper PUBLIC
     WRAPPING_CEF_SHARED
 )
 
+# Windows-specific compile definitions for CEF wrapper
+if(WIN32)
+    target_compile_definitions(cef_dll_wrapper PUBLIC
+        WIN32_LEAN_AND_MEAN
+        NOMINMAX
+        _CRT_SECURE_NO_WARNINGS
+        _UNICODE
+        UNICODE
+    )
+    
+    if(MSVC)
+        target_compile_options(cef_dll_wrapper PRIVATE
+            /permissive-
+            /W3
+            /wd4996
+        )
+    endif()
+endif()
+
 # Platform-specific CEF library handling
 if(UNIX AND NOT APPLE)
     # Linux
@@ -127,23 +146,50 @@ if(UNIX AND NOT APPLE)
     endif()
     
 elseif(WIN32)
-    # Windows
-    set(CEF_BINARY_DIR "${CEF_ROOT}/Release")
+    # Windows - Set binary directory based on build configuration
+    if(CMAKE_BUILD_TYPE STREQUAL "Debug")
+        set(CEF_BINARY_DIR "${CEF_ROOT}/Debug")
+        set(CEF_SANDBOX_LIB "${CEF_ROOT}/Debug/cef_sandbox.lib")
+    else()
+        set(CEF_BINARY_DIR "${CEF_ROOT}/Release")
+        set(CEF_SANDBOX_LIB "${CEF_ROOT}/Release/cef_sandbox.lib")
+    endif()
+    
     set(CEF_LIBRARIES
         "${CEF_BINARY_DIR}/libcef.lib"
-        "${CEF_ROOT}/Debug/cef_sandbox.lib"  # Use debug sandbox for now
+        "${CEF_SANDBOX_LIB}"
     )
     
-    # Copy CEF DLLs
-    configure_file("${CEF_BINARY_DIR}/libcef.dll" "${CMAKE_BINARY_DIR}/libcef.dll" COPYONLY)
-    file(GLOB CEF_RELEASE_DLLS "${CEF_BINARY_DIR}/*.dll")
-    foreach(DLL ${CEF_RELEASE_DLLS})
+    # Copy CEF DLLs from the appropriate directory
+    if(EXISTS "${CEF_BINARY_DIR}/libcef.dll")
+        configure_file("${CEF_BINARY_DIR}/libcef.dll" "${CMAKE_BINARY_DIR}/libcef.dll" COPYONLY)
+    endif()
+    
+    # Copy all DLLs from CEF binary directory
+    file(GLOB CEF_DLLS "${CEF_BINARY_DIR}/*.dll")
+    foreach(DLL ${CEF_DLLS})
         get_filename_component(DLL_NAME ${DLL} NAME)
         configure_file(${DLL} "${CMAKE_BINARY_DIR}/${DLL_NAME}" COPYONLY)
     endforeach()
     
-    # Copy resources
+    # Copy V8 snapshot files (if they exist)
+    if(EXISTS "${CEF_BINARY_DIR}/snapshot_blob.bin")
+        configure_file("${CEF_BINARY_DIR}/snapshot_blob.bin" "${CMAKE_BINARY_DIR}/snapshot_blob.bin" COPYONLY)
+    endif()
+    if(EXISTS "${CEF_BINARY_DIR}/v8_context_snapshot.bin")
+        configure_file("${CEF_BINARY_DIR}/v8_context_snapshot.bin" "${CMAKE_BINARY_DIR}/v8_context_snapshot.bin" COPYONLY)
+    endif()
+    
+    # Copy CEF resources
+    message(STATUS "Copying CEF resources from: ${CEF_ROOT}/Resources/")
     file(COPY "${CEF_ROOT}/Resources/" DESTINATION "${CMAKE_BINARY_DIR}/")
+    
+    # Verify icudtl.dat was copied
+    if(NOT EXISTS "${CMAKE_BINARY_DIR}/icudtl.dat")
+        message(WARNING "icudtl.dat not found in build directory after copy")
+    else()
+        message(STATUS "icudtl.dat successfully copied to build directory")
+    endif()
 endif()
 
 # Create executable
@@ -165,15 +211,45 @@ target_link_libraries(${PROJECT_NAME} PRIVATE
     ${Vulkan_LIBRARIES}
     glfw
     Threads::Threads
-    dl
-    X11
 )
+
+# Platform-specific libraries
+if(UNIX AND NOT APPLE)
+    # Linux-specific libraries
+    target_link_libraries(${PROJECT_NAME} PRIVATE dl X11)
+elseif(WIN32)
+    # Windows-specific libraries for CEF and system integration
+    target_link_libraries(${PROJECT_NAME} PRIVATE 
+        user32 gdi32 shell32 ole32 oleaut32 uuid winmm
+        advapi32 kernel32 ws2_32 psapi dbghelp comctl32
+    )
+endif()
 
 # Compile definitions
 target_compile_definitions(${PROJECT_NAME} PRIVATE
     USING_CEF_SHARED
     WRAPPING_CEF_SHARED
 )
+
+# Windows-specific compile definitions
+if(WIN32)
+    target_compile_definitions(${PROJECT_NAME} PRIVATE
+        WIN32_LEAN_AND_MEAN
+        NOMINMAX
+        _CRT_SECURE_NO_WARNINGS
+        _UNICODE
+        UNICODE
+    )
+    
+    # MSVC-specific compiler flags
+    if(MSVC)
+        target_compile_options(${PROJECT_NAME} PRIVATE
+            /permissive-  # Conformance mode
+            /W3           # Warning level
+            /wd4996       # Disable deprecated function warnings
+        )
+    endif()
+endif()
 
 # Set RPATH for Linux to find CEF shared library
 if(UNIX AND NOT APPLE)
