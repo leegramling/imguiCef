@@ -155,10 +155,24 @@ elseif(WIN32)
         set(CEF_SANDBOX_LIB "${CEF_ROOT}/Release/cef_sandbox.lib")
     endif()
     
-    set(CEF_LIBRARIES
-        "${CEF_BINARY_DIR}/libcef.lib"
-        "${CEF_SANDBOX_LIB}"
-    )
+    # Option to disable CEF sandbox (recommended for development)
+    option(USE_CEF_SANDBOX "Enable CEF sandbox" OFF)
+    
+    if(USE_CEF_SANDBOX AND EXISTS "${CEF_SANDBOX_LIB}")
+        set(CEF_LIBRARIES
+            "${CEF_BINARY_DIR}/libcef.lib"
+            "${CEF_SANDBOX_LIB}"
+        )
+        message(STATUS "CEF sandbox enabled - linking ${CEF_SANDBOX_LIB}")
+    else()
+        set(CEF_LIBRARIES
+            "${CEF_BINARY_DIR}/libcef.lib"
+        )
+        if(USE_CEF_SANDBOX)
+            message(WARNING "CEF sandbox requested but library not found: ${CEF_SANDBOX_LIB}")
+        endif()
+        message(STATUS "CEF sandbox disabled for easier development")
+    endif()
     
     # Copy CEF DLLs from the appropriate directory
     if(EXISTS "${CEF_BINARY_DIR}/libcef.dll")
@@ -222,6 +236,7 @@ elseif(WIN32)
     target_link_libraries(${PROJECT_NAME} PRIVATE 
         user32 gdi32 shell32 ole32 oleaut32 uuid winmm
         advapi32 kernel32 ws2_32 psapi dbghelp comctl32
+        winspool comdlg32 odbc32 odbccp32 shlwapi propsys
     )
 endif()
 

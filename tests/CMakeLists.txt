@@ -25,10 +25,19 @@ elseif(WIN32)
         set(CEF_SANDBOX_LIB "${CEF_ROOT}/Release/cef_sandbox.lib")
     endif()
     
-    set(CEF_LIBRARIES
-        "${CEF_BINARY_DIR}/libcef.lib"
-        "${CEF_SANDBOX_LIB}"
-    )
+    # Option to disable CEF sandbox (recommended for development)
+    option(USE_CEF_SANDBOX "Enable CEF sandbox" OFF)
+    
+    if(USE_CEF_SANDBOX AND EXISTS "${CEF_SANDBOX_LIB}")
+        set(CEF_LIBRARIES
+            "${CEF_BINARY_DIR}/libcef.lib"
+            "${CEF_SANDBOX_LIB}"
+        )
+    else()
+        set(CEF_LIBRARIES
+            "${CEF_BINARY_DIR}/libcef.lib"
+        )
+    endif()
 endif()
 
 # Test sources

@@ -22,6 +22,11 @@ The CMake configuration has been updated to support Windows compilation alongsid
 - Debug builds use `${CEF_ROOT}/Debug/`, Release builds use `${CEF_ROOT}/Release/`
 - CEF sandbox library selection is now configuration-aware
 
+**CEF Sandbox Handling**:
+- CEF sandbox is **disabled by default** to avoid linking issues
+- Can be enabled with `-DUSE_CEF_SANDBOX=ON` if needed for production
+- Sandbox linking often causes issues with MSVC - disabling is recommended for development
+
 **Windows Resource Handling**:
 - Improved DLL copying from appropriate CEF binary directory
 - Added V8 snapshot file copying for Windows
@@ -86,6 +91,13 @@ cmake .. -G "Visual Studio 16 2019" -A x64
 cmake --build . --config Release
 ```
 
+### Option 2a: Enable CEF Sandbox (Optional)
+If you need CEF sandbox enabled (not recommended for development):
+```cmd
+cmake .. -G "Visual Studio 16 2019" -A x64 -DUSE_CEF_SANDBOX=ON
+cmake --build . --config Release
+```
+
 ### Option 3: Command Line with Ninja
 ```cmd
 # Open "Developer Command Prompt for VS"
@@ -127,7 +139,12 @@ test_cef_initialize.exe
 
 ### Common Issues
 
-1. **CEF Library Not Found**
+1. **CEF Sandbox Linking Errors**
+   - CEF sandbox is disabled by default to avoid MSVC linking issues
+   - If you need sandbox, use `-DUSE_CEF_SANDBOX=ON` but expect potential linking problems
+   - For development, the disabled sandbox is sufficient and recommended
+
+2. **CEF Library Not Found**
    - Ensure CEF binary path in CMakeLists.txt line 29 matches your CEF version
    - Verify CEF binary distribution contains both Debug and Release folders
 
