@@ -1,10 +1,12 @@
+#ifdef _WIN32
+#define GLFW_EXPOSE_NATIVE_WIN32
+#include <windows.h>
+#include <GLFW/glfw3native.h>
+#endif
+
 #include "../include/icon_loader.h"
 #include <iostream>
 #include <filesystem>
-
-#ifdef _WIN32
-#include <windows.h>
-#endif
 
 // Simple PNG loader without external dependencies
 // For production, consider using stb_image or similar
