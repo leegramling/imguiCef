@@ -25,6 +25,7 @@
 #include "../include/vulkan_renderer.h"
 #include "../include/cef_app_impl.h"
 #include "../include/cef_client_impl.h"
+#include "../include/icon_loader.h"
 
 class Application {
 public:
@@ -139,11 +140,20 @@ bool Application::InitializeWindow() {
     if (!glfwInit()) {
         return false;
     }
-    
+
     glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
     m_Window = glfwCreateWindow(1280, 720, "ImGui + CEF + Vulkan Browser", nullptr, nullptr);
-    
-    return m_Window != nullptr;
+
+    if (m_Window == nullptr) {
+        return false;
+    }
+
+    // Load and set window icon for Windows 11 taskbar compatibility
+    if (!IconLoader::LoadAndSetWindowIcon(m_Window, "icons")) {
+        std::cerr << "Warning: Failed to load window icon" << std::endl;
+    }
+
+    return true;
 }
 
 bool Application::InitializeVulkan() {
