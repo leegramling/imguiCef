@@ -149,8 +149,11 @@ bool Application::InitializeWindow() {
     }
 
     // Load and set window icon for Windows 11 taskbar compatibility
+    std::cout << "Attempting to load window icons..." << std::endl;
     if (!IconLoader::LoadAndSetWindowIcon(m_Window, "icons")) {
         std::cerr << "Warning: Failed to load window icon" << std::endl;
+    } else {
+        std::cout << "Icon loading completed successfully" << std::endl;
     }
 
     return true;

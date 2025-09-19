@@ -174,6 +174,8 @@ bool IconLoader::LoadAndSetWindowIcon(GLFWwindow* window, const std::string& ico
     // Additional Windows-specific handling for better taskbar integration
     HWND hwnd = glfwGetWin32Window(window);
     if (hwnd) {
+        std::cout << "Windows detected - HWND obtained: " << hwnd << std::endl;
+
         // For Windows 11, ensure we have the right icon sizes
         // The system will automatically scale, but providing multiple sizes helps
 
@@ -183,12 +185,21 @@ bool IconLoader::LoadAndSetWindowIcon(GLFWwindow* window, const std::string& ico
         // - 32x32 for large icons (taskbar, Alt+Tab)
         // - 48x48 for extra large icons (desktop, some contexts)
 
-        std::cout << "Windows detected - icons should now appear in taskbar" << std::endl;
+        std::cout << "About to call ShowWindow to refresh icon..." << std::endl;
 
         // Force a window update to ensure the icon change takes effect
         ShowWindow(hwnd, SW_HIDE);
+        std::cout << "Called ShowWindow(SW_HIDE)" << std::endl;
+
         ShowWindow(hwnd, SW_SHOW);
+        std::cout << "Called ShowWindow(SW_SHOW)" << std::endl;
+
+        std::cout << "Windows icon refresh complete" << std::endl;
+    } else {
+        std::cout << "Warning: Could not get Windows HWND for icon refresh" << std::endl;
     }
+#else
+    std::cout << "Non-Windows platform - using GLFW icon only" << std::endl;
 #endif
 
     std::cout << "Successfully set window icon with " << images.size() << " size(s)" << std::endl;
