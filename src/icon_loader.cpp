@@ -198,6 +198,10 @@ bool IconLoader::LoadAndSetWindowIcon(GLFWwindow* window, const std::string& ico
     std::vector<GLFWimage> images;
     std::vector<IconData> iconData;
 
+    // Reserve space to avoid reallocation during push_back
+    images.reserve(iconFiles.size());
+    iconData.reserve(iconFiles.size());
+
     // Load all available icon sizes
     for (const std::string& filepath : iconFiles) {
         IconData icon;
@@ -208,9 +212,11 @@ bool IconLoader::LoadAndSetWindowIcon(GLFWwindow* window, const std::string& ico
             glfwImage.pixels = icon.pixels;
 
             images.push_back(glfwImage);
-            iconData.push_back(std::move(icon));
 
             std::cout << "Loaded icon: " << filepath << " (" << icon.width << "x" << icon.height << ")" << std::endl;
+
+            // Move the icon to avoid double-delete
+            iconData.push_back(std::move(icon));
         }
     }
 

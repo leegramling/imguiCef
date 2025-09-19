@@ -12,7 +12,37 @@ public:
         unsigned char* pixels;
 
         IconData() : width(0), height(0), pixels(nullptr) {}
-        ~IconData() { if (pixels) delete[] pixels; }
+        ~IconData() {
+            if (pixels) {
+                delete[] pixels;
+                pixels = nullptr;
+            }
+        }
+
+        // Prevent copying to avoid double-delete
+        IconData(const IconData&) = delete;
+        IconData& operator=(const IconData&) = delete;
+
+        // Allow moving
+        IconData(IconData&& other) noexcept
+            : width(other.width), height(other.height), pixels(other.pixels) {
+            other.pixels = nullptr;
+            other.width = 0;
+            other.height = 0;
+        }
+
+        IconData& operator=(IconData&& other) noexcept {
+            if (this != &other) {
+                if (pixels) delete[] pixels;
+                width = other.width;
+                height = other.height;
+                pixels = other.pixels;
+                other.pixels = nullptr;
+                other.width = 0;
+                other.height = 0;
+            }
+            return *this;
+        }
     };
 
     static bool LoadAndSetWindowIcon(GLFWwindow* window, const std::string& iconPath = "icons");
