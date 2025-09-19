@@ -117,16 +117,34 @@ bool IconLoader::LoadPNGIcon(const std::string& filepath, IconData& icon) {
 std::vector<std::string> IconLoader::GetIconFilenames(const std::string& basePath) {
     std::vector<std::string> filenames;
 
+    // Check if directory exists
+    if (!std::filesystem::exists(basePath)) {
+        std::cout << "Directory does not exist: " << basePath << std::endl;
+        return filenames;
+    }
+
+    if (!std::filesystem::is_directory(basePath)) {
+        std::cout << "Path is not a directory: " << basePath << std::endl;
+        return filenames;
+    }
+
+    std::cout << "Directory exists: " << basePath << std::endl;
+
     // Standard icon sizes for Windows 11 taskbar compatibility
     std::vector<int> sizes = {16, 32, 48};
 
     for (int size : sizes) {
         std::string filename = basePath + "/browser_" + std::to_string(size) + "x" + std::to_string(size) + ".png";
+        std::cout << "Checking for: " << filename << std::endl;
         if (std::filesystem::exists(filename)) {
             filenames.push_back(filename);
+            std::cout << "Found icon: " << filename << std::endl;
+        } else {
+            std::cout << "Icon not found: " << filename << std::endl;
         }
     }
 
+    std::cout << "Total icons found: " << filenames.size() << std::endl;
     return filenames;
 }
 
@@ -136,10 +154,44 @@ bool IconLoader::LoadAndSetWindowIcon(GLFWwindow* window, const std::string& ico
         return false;
     }
 
-    std::vector<std::string> iconFiles = GetIconFilenames(iconPath);
+    // Get the current working directory for debugging
+    std::cout << "Current working directory: " << std::filesystem::current_path() << std::endl;
+
+    // Try multiple possible icon paths
+    std::vector<std::string> searchPaths;
+
+    // First try the provided path
+    searchPaths.push_back(iconPath);
+
+#ifdef _WIN32
+    // On Windows, also try relative to executable
+    char exePath[MAX_PATH];
+    if (GetModuleFileNameA(NULL, exePath, MAX_PATH)) {
+        std::filesystem::path exeDir = std::filesystem::path(exePath).parent_path();
+        searchPaths.push_back((exeDir / iconPath).string());
+        std::cout << "Executable directory: " << exeDir << std::endl;
+    }
+#endif
+
+    // Try each search path
+    std::vector<std::string> iconFiles;
+    std::string usedPath;
+
+    for (const auto& searchPath : searchPaths) {
+        std::cout << "Checking for icons in: " << searchPath << std::endl;
+        iconFiles = GetIconFilenames(searchPath);
+        if (!iconFiles.empty()) {
+            usedPath = searchPath;
+            std::cout << "Found icons in: " << usedPath << std::endl;
+            break;
+        }
+    }
 
     if (iconFiles.empty()) {
-        std::cerr << "No icon files found in: " << iconPath << std::endl;
+        std::cerr << "No icon files found in any of the searched paths:" << std::endl;
+        for (const auto& path : searchPaths) {
+            std::cerr << "  - " << path << std::endl;
+        }
         return false;
     }
 
