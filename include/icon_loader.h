@@ -6,9 +6,6 @@
 
 class IconLoader {
 public:
-    static bool LoadAndSetWindowIcon(GLFWwindow* window, const std::string& iconPath = "icons");
-
-private:
     struct IconData {
         int width;
         int height;
@@ -18,6 +15,9 @@ private:
         ~IconData() { if (pixels) delete[] pixels; }
     };
 
+    static bool LoadAndSetWindowIcon(GLFWwindow* window, const std::string& iconPath = "icons");
+
+private:
     static bool LoadPNGIcon(const std::string& filepath, IconData& icon);
     static std::vector<std::string> GetIconFilenames(const std::string& basePath);
 };
