@@ -56,6 +56,17 @@ set(SOURCES
     src/icon_loader.cpp
 )
 
+# Windows resource file for embedded icon
+if(WIN32)
+    set(RESOURCE_FILE "${CMAKE_CURRENT_SOURCE_DIR}/resources/app.rc")
+    if(EXISTS "${RESOURCE_FILE}")
+        list(APPEND SOURCES ${RESOURCE_FILE})
+        message(STATUS "Added Windows resource file: ${RESOURCE_FILE}")
+    else()
+        message(WARNING "Windows resource file not found: ${RESOURCE_FILE}")
+    endif()
+endif()
+
 # ImGui sources
 set(IMGUI_SOURCES
     ${IMGUI_DIR}/imgui.cpp

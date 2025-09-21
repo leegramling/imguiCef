@@ -1,0 +1,35 @@
+#include <windows.h>
+#include "resource.h"
+
+// Icon resource - Windows will use this for taskbar, title bar, Alt+Tab, etc.
+IDI_ICON1 ICON "browser.ico"
+
+// Version information
+VS_VERSION_INFO VERSIONINFO
+FILEVERSION     1,0,0,0
+PRODUCTVERSION  1,0,0,0
+FILEFLAGSMASK   VS_FFI_FILEFLAGSMASK
+FILEFLAGS       0
+FILEOS          VOS__WINDOWS32
+FILETYPE        VFT_APP
+FILESUBTYPE     VFT2_UNKNOWN
+BEGIN
+    BLOCK "StringFileInfo"
+    BEGIN
+        BLOCK "040904E4"
+        BEGIN
+            VALUE "CompanyName",        "ImGuiCefVulkan"
+            VALUE "FileDescription",   "ImGui + CEF + Vulkan Browser"
+            VALUE "FileVersion",       "1.0.0.0"
+            VALUE "InternalName",      "ImGuiCefVulkan"
+            VALUE "LegalCopyright",    "Copyright (C) 2024"
+            VALUE "OriginalFilename",  "ImGuiCefVulkan.exe"
+            VALUE "ProductName",       "ImGui CEF Vulkan Browser"
+            VALUE "ProductVersion",    "1.0.0.0"
+        END
+    END
+    BLOCK "VarFileInfo"
+    BEGIN
+        VALUE "Translation", 0x409, 1252
+    END
+END

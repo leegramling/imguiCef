@@ -1,26 +1,47 @@
 # Windows 11 Taskbar Icon Setup for ImGuiCefVulkan
 
-This project now includes Windows 11 compatible icon loading functionality to ensure proper taskbar icon display.
+This project includes two approaches for Windows 11 taskbar icon display:
+1. **Embedded Resource (Recommended)** - Icon compiled into the executable
+2. **Runtime Loading** - Dynamic icon loading via GLFW
 
 ## Files Added
 
-### Icon Generation
-- `create_icons.py` - Python script to generate browser icons in multiple sizes
+### Embedded Resource Approach (Recommended for Windows)
+- `resources/app.rc` - Windows resource file with embedded icon
+- `resources/resource.h` - Resource definitions
+- `resources/browser.ico` - Embedded icon file
+- Updated `CMakeLists.txt` to compile resources on Windows
+
+### Runtime Loading Approach (Cross-platform)
+- `create_icons.py` - Python script to generate icons in multiple sizes
 - `icons/` directory containing:
   - `browser_16x16.png` - Small icon for title bars
   - `browser_32x32.png` - Standard taskbar icon
   - `browser_48x48.png` - Large icon for high-DPI displays
   - `browser.ico` - Windows ICO file with multiple sizes
-
-### Icon Loading System
 - `include/icon_loader.h` - Header file for the IconLoader class
 - `src/icon_loader.cpp` - Implementation of icon loading functionality
 
 ## How It Works
 
-### Windows 11 Taskbar Compatibility
-The icon loader specifically addresses Windows 11 taskbar icon issues by:
+### 1. Embedded Resource Approach (Recommended)
 
+Windows automatically uses embedded icon resources for:
+- **Taskbar icons** - What appears in the Windows taskbar
+- **Title bar icons** - Small icon in window title bar
+- **Alt+Tab switcher** - Icon shown when switching between applications
+- **Task Manager** - Icon displayed in process list
+- **File associations** - Icon for the executable file
+
+**How it works:**
+- Icon is compiled directly into the `.exe` file during build
+- Windows automatically detects and uses `IDI_ICON1` resource
+- No runtime loading required - works immediately
+- Guaranteed to work on all Windows versions
+
+### 2. Runtime Loading Approach (Cross-platform)
+
+For cross-platform compatibility and dynamic icon changes:
 1. **Multiple Icon Sizes**: Provides 16x16, 32x32, and 48x48 icons for different display contexts
 2. **GLFW Integration**: Uses `glfwSetWindowIcon()` with multiple sizes
 3. **Windows-Specific Handling**: Includes Windows API calls to force icon refresh
