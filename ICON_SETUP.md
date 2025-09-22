@@ -153,20 +153,39 @@ No code integration required! The icon is automatically embedded during Windows 
 - **Multiple Sizes**: Always create 16x16, 32x32, and 48x48 versions for best Windows 11 compatibility
 - **File Paths**: Make sure the icon file path in the .rc file is correct relative to the .rc file location
 
-## CMake Integration (Alternative to Visual Studio)
+## CMake Integration (Works with Visual Studio)
 
-For CMake-based projects (like this one):
+For CMake-based projects (like this one), which also makes resource files appear in Visual Studio:
 
 ```cmake
-# Windows resource file for embedded icon
+# Windows resource files for embedded icon
 if(WIN32)
-    set(RESOURCE_FILE "${CMAKE_CURRENT_SOURCE_DIR}/resources/app.rc")
-    if(EXISTS "${RESOURCE_FILE}")
-        list(APPEND SOURCES ${RESOURCE_FILE})
-        message(STATUS "Added Windows resource file: ${RESOURCE_FILE}")
-    endif()
+    set(RESOURCE_FILES
+        "${CMAKE_CURRENT_SOURCE_DIR}/resources/app.rc"
+        "${CMAKE_CURRENT_SOURCE_DIR}/resources/resource.h"
+        "${CMAKE_CURRENT_SOURCE_DIR}/resources/browser.ico"
+    )
+
+    # Add resource files to project for Visual Studio
+    foreach(RESOURCE_FILE ${RESOURCE_FILES})
+        if(EXISTS "${RESOURCE_FILE}")
+            list(APPEND SOURCES ${RESOURCE_FILE})
+            message(STATUS "Added resource file: ${RESOURCE_FILE}")
+        else()
+            message(WARNING "Resource file not found: ${RESOURCE_FILE}")
+        endif()
+    endforeach()
+
+    # Set source groups for Visual Studio organization
+    source_group("Resource Files" FILES ${RESOURCE_FILES})
 endif()
 ```
+
+This CMake configuration:
+- ✅ Includes all resource files in the build
+- ✅ Makes them visible in Visual Studio Solution Explorer
+- ✅ Organizes them in a "Resource Files" folder
+- ✅ Provides helpful build messages
 
 ## Usage in Other Projects
 

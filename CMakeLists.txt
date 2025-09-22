@@ -55,15 +55,26 @@ set(SOURCES
     src/imgui_layer.cpp
 )
 
-# Windows resource file for embedded icon
+# Windows resource files for embedded icon
 if(WIN32)
-    set(RESOURCE_FILE "${CMAKE_CURRENT_SOURCE_DIR}/resources/app.rc")
-    if(EXISTS "${RESOURCE_FILE}")
-        list(APPEND SOURCES ${RESOURCE_FILE})
-        message(STATUS "Added Windows resource file: ${RESOURCE_FILE}")
-    else()
-        message(WARNING "Windows resource file not found: ${RESOURCE_FILE}")
-    endif()
+    set(RESOURCE_FILES
+        "${CMAKE_CURRENT_SOURCE_DIR}/resources/app.rc"
+        "${CMAKE_CURRENT_SOURCE_DIR}/resources/resource.h"
+        "${CMAKE_CURRENT_SOURCE_DIR}/resources/browser.ico"
+    )
+
+    # Add resource files to project for Visual Studio
+    foreach(RESOURCE_FILE ${RESOURCE_FILES})
+        if(EXISTS "${RESOURCE_FILE}")
+            list(APPEND SOURCES ${RESOURCE_FILE})
+            message(STATUS "Added resource file: ${RESOURCE_FILE}")
+        else()
+            message(WARNING "Resource file not found: ${RESOURCE_FILE}")
+        endif()
+    endforeach()
+
+    # Set source groups for Visual Studio organization
+    source_group("Resource Files" FILES ${RESOURCE_FILES})
 endif()
 
 # ImGui sources
@@ -226,6 +237,22 @@ endif()
 
 # Create executable
 add_executable(${PROJECT_NAME} ${SOURCES} ${IMGUI_SOURCES})
+
+# Organize files in Visual Studio Solution Explorer
+if(WIN32)
+    source_group("Source Files" FILES ${SOURCES})
+    source_group("ImGui" FILES ${IMGUI_SOURCES})
+
+    # Organize by subdirectories
+    foreach(SOURCE IN ITEMS ${SOURCES})
+        get_filename_component(SOURCE_PATH "${SOURCE}" PATH)
+        string(REPLACE "${CMAKE_CURRENT_SOURCE_DIR}" "" GROUP_PATH "${SOURCE_PATH}")
+        string(REPLACE "/" "\\" GROUP_PATH "${GROUP_PATH}")
+        if(GROUP_PATH)
+            source_group("${GROUP_PATH}" FILES "${SOURCE}")
+        endif()
+    endforeach()
+endif()
 
 # Include directories
 target_include_directories(${PROJECT_NAME} PRIVATE
