@@ -1,30 +1,19 @@
-# Windows 11 Taskbar Icon Setup for ImGuiCefVulkan
+# Windows Icon Setup for ImGuiCefVulkan
 
-This project includes two approaches for Windows 11 taskbar icon display:
-1. **Embedded Resource (Recommended)** - Icon compiled into the executable
-2. **Runtime Loading** - Dynamic icon loading via GLFW
+This project uses embedded Windows resources for proper taskbar icon display on Windows 11.
 
 ## Files Added
 
-### Embedded Resource Approach (Recommended for Windows)
+### Embedded Resource Implementation
 - `resources/app.rc` - Windows resource file with embedded icon
 - `resources/resource.h` - Resource definitions
-- `resources/browser.ico` - Embedded icon file
-- Updated `CMakeLists.txt` to compile resources on Windows
-
-### Runtime Loading Approach (Cross-platform)
-- `create_icons.py` - Python script to generate icons in multiple sizes
-- `icons/` directory containing:
-  - `browser_16x16.png` - Small icon for title bars
-  - `browser_32x32.png` - Standard taskbar icon
-  - `browser_48x48.png` - Large icon for high-DPI displays
-  - `browser.ico` - Windows ICO file with multiple sizes
-- `include/icon_loader.h` - Header file for the IconLoader class
-- `src/icon_loader.cpp` - Implementation of icon loading functionality
+- `resources/browser.ico` - Rocket-themed icon file (embedded in executable)
+- `create_icons.py` - Python script to generate the rocket icon
+- Updated `CMakeLists.txt` to compile resources on Windows builds
 
 ## How It Works
 
-### 1. Embedded Resource Approach (Recommended)
+### Embedded Resource Approach
 
 Windows automatically uses embedded icon resources for:
 - **Taskbar icons** - What appears in the Windows taskbar
@@ -38,90 +27,70 @@ Windows automatically uses embedded icon resources for:
 - Windows automatically detects and uses `IDI_ICON1` resource
 - No runtime loading required - works immediately
 - Guaranteed to work on all Windows versions
+- No external files needed - completely self-contained
 
-### 2. Runtime Loading Approach (Cross-platform)
+### Rocket Icon Design
 
-For cross-platform compatibility and dynamic icon changes:
-1. **Multiple Icon Sizes**: Provides 16x16, 32x32, and 48x48 icons for different display contexts
-2. **GLFW Integration**: Uses `glfwSetWindowIcon()` with multiple sizes
-3. **Windows-Specific Handling**: Includes Windows API calls to force icon refresh
-4. **Fallback System**: Creates icons programmatically if PNG files aren't available
-
-### Key Features
-- **Automatic Icon Detection**: Scans the `icons/` directory for properly named files
-- **Size Validation**: Ensures only supported icon sizes (16x16, 32x32, 48x48) are loaded
-- **Memory Management**: Proper cleanup of icon data
-- **Cross-Platform**: Works on Windows, Linux, and macOS
-- **Error Handling**: Graceful fallback if icons can't be loaded
+The embedded icon features:
+- **Rocket Shape**: Classic rocket with pointed nose cone and stabilizer fins
+- **Fire Trail**: Multi-layered exhaust with orange-to-yellow gradient
+- **15° Right Tilt**: Dynamic angled appearance
+- **Multi-Size Support**: 16x16, 32x32, and 48x48 sizes in single ICO file
+- **Progressive Detail**: More details visible at larger sizes
 
 ## Integration
 
-The icon loading is integrated into the main application in `src/main.cpp`:
+No code integration required! The icon is automatically embedded during Windows builds:
 
-```cpp
-#include "../include/icon_loader.h"
-
-// In InitializeWindow():
-if (!IconLoader::LoadAndSetWindowIcon(m_Window, "icons")) {
-    std::cerr << "Warning: Failed to load window icon" << std::endl;
-}
-```
+1. **CMake detects Windows** and includes `resources/app.rc`
+2. **Resource compiler** embeds the icon into the executable
+3. **Windows automatically** uses the embedded icon for taskbar/title bar
 
 ## Usage in Other Projects
 
-To use this icon system in another project:
+To use this embedded icon system in another project:
 
 1. **Copy Files**:
-   - `include/icon_loader.h`
-   - `src/icon_loader.cpp`
-   - `create_icons.py`
+   - `resources/app.rc`
+   - `resources/resource.h`
+   - `create_icons.py` (to generate your own icon)
 
 2. **Add to CMakeLists.txt**:
    ```cmake
-   set(SOURCES
-       # ... your existing sources
-       src/icon_loader.cpp
-   )
+   # Windows resource file for embedded icon
+   if(WIN32)
+       set(RESOURCE_FILE "${CMAKE_CURRENT_SOURCE_DIR}/resources/app.rc")
+       if(EXISTS "${RESOURCE_FILE}")
+           list(APPEND SOURCES ${RESOURCE_FILE})
+       endif()
+   endif()
    ```
 
-3. **Include and Use**:
-   ```cpp
-   #include "icon_loader.h"
-
-   // After creating your GLFW window:
-   IconLoader::LoadAndSetWindowIcon(window, "path/to/icons");
-   ```
-
-4. **Generate Icons**:
+3. **Generate Your Icon**:
    ```bash
    python3 create_icons.py
+   cp icons/browser.ico resources/
    ```
 
-## Windows 11 Specific Notes
+4. **Build**:
+   The icon will be automatically embedded in your Windows executable!
 
-Windows 11 can be particular about taskbar icons. This implementation addresses common issues:
+## Benefits of Embedded Resources
 
-- **Icon Refresh**: Forces window hide/show to refresh the taskbar icon
-- **Multiple Sizes**: Provides all standard Windows icon sizes
-- **Proper Format**: Uses RGBA format that Windows expects
-- **Memory Layout**: Ensures correct pixel data ordering
-
-## Troubleshooting
-
-If icons still don't appear on Windows 11:
-
-1. **Verify Icon Files**: Ensure `icons/` directory contains the PNG files
-2. **Check Permissions**: Make sure the application can read the icon files
-3. **DPI Settings**: High-DPI displays may require the 48x48 icon
-4. **Windows Cache**: Try restarting the application or clearing icon cache
-5. **Build Configuration**: Ensure `icon_loader.cpp` is included in the build
+✅ **No external files** - Icon is baked into the executable
+✅ **Automatic detection** - Windows handles everything automatically
+✅ **No path issues** - No need to worry about working directories
+✅ **No runtime code** - Zero performance impact
+✅ **Industry standard** - This is how professional Windows applications handle icons
+✅ **Future-proof** - Works with all Windows versions
 
 ## Customization
 
-To use custom icons:
+To create your own rocket icon design:
 
-1. Replace the generated icons with your own 16x16, 32x32, and 48x48 PNG files
-2. Keep the naming convention: `browser_WIDTHxHEIGHT.png`
-3. Or modify the `GetIconFilenames()` function for different naming
+1. **Edit the Python script**: Modify `create_icons.py` to change colors, shape, or design
+2. **Regenerate**: Run `python3 create_icons.py` to create new icons
+3. **Copy to resources**: `cp icons/browser.ico resources/`
+4. **Rebuild**: The new icon will be embedded automatically
 
-The icon loader is designed to be flexible and reusable across different projects requiring Windows 11 taskbar compatibility.
+The embedded resource approach is the clean, professional solution for Windows application icons.

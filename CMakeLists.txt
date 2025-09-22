@@ -53,7 +53,6 @@ set(SOURCES
     src/cef_app.cpp
     src/cef_client.cpp
     src/imgui_layer.cpp
-    src/icon_loader.cpp
 )
 
 # Windows resource file for embedded icon

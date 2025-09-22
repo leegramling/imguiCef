@@ -25,7 +25,6 @@
 #include "../include/vulkan_renderer.h"
 #include "../include/cef_app_impl.h"
 #include "../include/cef_client_impl.h"
-#include "../include/icon_loader.h"
 
 class Application {
 public:
@@ -148,13 +147,8 @@ bool Application::InitializeWindow() {
         return false;
     }
 
-    // Load and set window icon for Windows 11 taskbar compatibility
-    std::cout << "Attempting to load window icons..." << std::endl;
-    if (!IconLoader::LoadAndSetWindowIcon(m_Window, "icons")) {
-        std::cerr << "Warning: Failed to load window icon" << std::endl;
-    } else {
-        std::cout << "Icon loading completed successfully" << std::endl;
-    }
+    // Note: Window icon is now handled via embedded Windows resource file (resources/app.rc)
+    // No runtime icon loading needed - Windows automatically uses the embedded icon
 
     return true;
 }
