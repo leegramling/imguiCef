@@ -78,6 +78,14 @@ private:
 };
 
 bool Application::Initialize(int argc, char* argv[]) {
+    for (int i = 1; i < argc; ++i) {
+        if (std::strcmp(argv[i], "--gpu-test") == 0) {
+            std::strncpy(m_UrlBuffer, "chrome://gpu", sizeof(m_UrlBuffer) - 1);
+            m_UrlBuffer[sizeof(m_UrlBuffer) - 1] = '\0';
+            break;
+        }
+    }
+
     if (!InitializeCEF(argc, argv)) {
         std::cerr << "Failed to initialize CEF" << std::endl;
         return false;

@@ -7,8 +7,6 @@ void CefAppImpl::OnContextInitialized() {
 
 void CefAppImpl::OnBeforeCommandLineProcessing(const CefString& process_type,
                                                CefRefPtr<CefCommandLine> command_line) {
-    // Disable GPU acceleration to avoid OpenGL library issues
-    command_line->AppendSwitch("disable-gpu");
-    command_line->AppendSwitch("disable-gpu-compositing");
-    command_line->AppendSwitch("disable-software-rasterizer");
+    // Intentionally leave GPU-related flags under caller control so Chromium
+    // can honor real command-line switches passed to the executable.
 }
