@@ -72,7 +72,20 @@ Download the appropriate CEF binary distribution for Windows:
 - Visit https://cef-builds.spotifycdn.com/index.html
 - Download CEF binary for Windows (matching your target architecture)
 - Extract to `cef_binary_<version>` directory in project root
-- Update `CMakeLists.txt` line 29 if version differs from 133.4.8
+- Configure CMake with `-DCEF_ROOT=<path-to-cef_binary_<version>>`
+
+The project defaults to the currently vendored CEF 133 bundle:
+```cmd
+cmake .. -G "Visual Studio 17 2022" -A x64
+```
+
+To test another SDK, such as a separate CEF 143 unpacked alongside it, use a different build directory and point `CEF_ROOT` at that bundle:
+```cmd
+mkdir build-cef143
+cd build-cef143
+cmake .. -G "Visual Studio 17 2022" -A x64 -DCEF_ROOT=C:\path\to\cef_binary_143.x.y
+cmake --build . --config Debug
+```
 
 ## Building on Windows
 
@@ -88,6 +101,14 @@ Download the appropriate CEF binary distribution for Windows:
 mkdir build
 cd build
 cmake .. -G "Visual Studio 16 2019" -A x64
+cmake --build . --config Release
+```
+
+To keep the default CEF 133 build intact while testing CEF 143, configure a separate build tree:
+```cmd
+mkdir build-cef143
+cd build-cef143
+cmake .. -G "Visual Studio 17 2022" -A x64 -DCEF_ROOT=C:\path\to\cef_binary_143.x.y
 cmake --build . --config Release
 ```
 
@@ -154,7 +175,7 @@ test_cef_initialize.exe
    - For development, the disabled sandbox is sufficient and recommended
 
 2. **CEF Library Not Found**
-   - Ensure CEF binary path in CMakeLists.txt line 29 matches your CEF version
+   - Ensure `CEF_ROOT` points at the CEF version you want to build against
    - Verify CEF binary distribution contains both Debug and Release folders
 
 2. **Missing DLLs at Runtime**

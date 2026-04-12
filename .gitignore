@@ -1,9 +1,12 @@
 # CEF Binary Distribution
 cef_binary_105.3.39/
 cef_binary_133.4.8/
+cef_binary_*/
+cef_binary_*.tar.bz2
 
 # Build directories
 build/
+build-*/
 Debug/
 Release/
 out/

@@ -5,6 +5,7 @@
 #include <cstring>
 #include <thread>
 #include <chrono>
+#include <filesystem>
 
 #ifdef _WIN32
 #include <windows.h>
@@ -25,6 +26,21 @@
 #include "../include/vulkan_renderer.h"
 #include "../include/cef_app_impl.h"
 #include "../include/cef_client_impl.h"
+
+#ifdef _WIN32
+namespace {
+std::filesystem::path GetExecutablePath() {
+    std::wstring buffer(MAX_PATH, L'\0');
+    DWORD length = GetModuleFileNameW(nullptr, buffer.data(), static_cast<DWORD>(buffer.size()));
+    buffer.resize(length);
+    return std::filesystem::path(buffer);
+}
+
+void SetCefPath(cef_string_t& target, const std::filesystem::path& path) {
+    CefString(&target).FromASCII(path.string().c_str());
+}
+}  // namespace
+#endif
 
 class Application {
 public:
@@ -105,24 +121,31 @@ bool Application::InitializeCEF(int argc, char* argv[]) {
     CefSettings settings;
     settings.windowless_rendering_enabled = true;
     settings.no_sandbox = true;
-    
-    // Set cache directory to avoid singleton behavior warnings
-    CefString(&settings.root_cache_path).FromASCII("./cef_cache");
-    
-    // Enable logging for debugging
+
     settings.log_severity = LOGSEVERITY_INFO;
-    CefString(&settings.log_file).FromASCII("./debug.log");
-    
-    // Add command line switches to disable GPU acceleration
     settings.command_line_args_disabled = false;
-    
-#if !defined(OS_WIN)
+
+#ifdef _WIN32
+    const std::filesystem::path exe_dir = GetExecutablePath().parent_path();
+    const std::filesystem::path build_dir = exe_dir.parent_path();
+    const std::filesystem::path cef_dir = exe_dir / "cef";
+
+    // Keep DLLs in the build root while letting the executable live in Debug/Release.
+    SetDllDirectoryW(build_dir.c_str());
+
+    SetCefPath(settings.root_cache_path, exe_dir / "cef_cache");
+    SetCefPath(settings.log_file, exe_dir / "debug.log");
+    SetCefPath(settings.resources_dir_path, cef_dir);
+    SetCefPath(settings.locales_dir_path, cef_dir / "locales");
+#else
     // On Linux, we need to set the resource paths - use current directory
-    // which should be the build directory when running
+    // which should be the build directory when running.
+    CefString(&settings.root_cache_path).FromASCII("./cef_cache");
+    CefString(&settings.log_file).FromASCII("./debug.log");
     CefString(&settings.locales_dir_path).FromASCII("./locales");
     CefString(&settings.resources_dir_path).FromASCII(".");
-    
-    // Debug: Print current working directory and check for required files
+
+    // Debug: Print current working directory and check for required files.
     std::cout << "Current working directory should contain CEF resources" << std::endl;
     std::cout << "Looking for icudtl.dat, locales/, etc. in current directory" << std::endl;
 #endif

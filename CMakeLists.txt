@@ -26,9 +26,25 @@ set(GLFW_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
 FetchContent_MakeAvailable(glfw)
 
 # CEF paths
-set(CEF_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/cef_binary_133.4.8")
+set(IMGUICEF_DEFAULT_CEF_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/cef_binary_133.4.8")
+set(CEF_ROOT "${IMGUICEF_DEFAULT_CEF_ROOT}" CACHE PATH "Path to the CEF binary distribution root")
 set(CEF_INCLUDE_DIR "${CEF_ROOT}/include")
 set(CEF_LIBCEF_DLL_DIR "${CEF_ROOT}/libcef_dll")
+
+if(NOT EXISTS "${CEF_INCLUDE_DIR}/cef_version.h")
+    message(FATAL_ERROR
+        "CEF headers not found under '${CEF_ROOT}'. "
+        "Point CEF_ROOT at a valid CEF binary distribution root."
+    )
+endif()
+
+file(STRINGS "${CEF_INCLUDE_DIR}/cef_version.h" CEF_VERSION_LINE
+    REGEX "^#define CEF_VERSION "
+    LIMIT_COUNT 1
+)
+string(REGEX REPLACE "^#define CEF_VERSION \"([^\"]+)\"$" "\\1"
+    CEF_VERSION_STRING "${CEF_VERSION_LINE}"
+)
 
 # Add CEF CMake modules to path
 list(APPEND CMAKE_MODULE_PATH "${CEF_ROOT}/cmake")
@@ -216,6 +232,15 @@ endif()
 # Create executable
 add_executable(${PROJECT_NAME} ${SOURCES} ${IMGUI_SOURCES})
 
+if(WIN32)
+    set(CEF_RUNTIME_ASSET_FILES
+        "icudtl.dat"
+        "vk_swiftshader_icd.json"
+        "snapshot_blob.bin"
+        "v8_context_snapshot.bin"
+    )
+endif()
+
 # Include directories
 target_include_directories(${PROJECT_NAME} PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/include
@@ -271,6 +296,24 @@ if(WIN32)
             /wd4996       # Disable deprecated function warnings
         )
     endif()
+
+    # Stage non-DLL CEF runtime assets under the executable directory.
+    add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E make_directory "$<TARGET_FILE_DIR:${PROJECT_NAME}>/cef"
+        COMMAND ${CMAKE_COMMAND} -E copy_directory "${CEF_ROOT}/Resources" "$<TARGET_FILE_DIR:${PROJECT_NAME}>/cef"
+        COMMENT "Copying CEF resource bundles to $<TARGET_FILE_DIR:${PROJECT_NAME}>/cef"
+    )
+
+    foreach(CEF_RUNTIME_ASSET_FILE ${CEF_RUNTIME_ASSET_FILES})
+        if(EXISTS "${CEF_BINARY_DIR}/${CEF_RUNTIME_ASSET_FILE}")
+            add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
+                COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                    "${CEF_BINARY_DIR}/${CEF_RUNTIME_ASSET_FILE}"
+                    "$<TARGET_FILE_DIR:${PROJECT_NAME}>/cef/${CEF_RUNTIME_ASSET_FILE}"
+                COMMENT "Copying CEF asset ${CEF_RUNTIME_ASSET_FILE} to $<TARGET_FILE_DIR:${PROJECT_NAME}>/cef"
+            )
+        endif()
+    endforeach()
 endif()
 
 # Set RPATH for Linux to find CEF shared library
@@ -332,6 +375,7 @@ if(UNIX AND NOT APPLE AND EXISTS "${CMAKE_BINARY_DIR}/chrome-sandbox")
 endif()
 
 message(STATUS "CEF Root: ${CEF_ROOT}")
+message(STATUS "CEF Version: ${CEF_VERSION_STRING}")
 message(STATUS "CEF Binary Dir: ${CEF_BINARY_DIR}")
 message(STATUS "Building with full CEF integration")
 message(STATUS "Make sure to run from build directory for proper resource loading")
