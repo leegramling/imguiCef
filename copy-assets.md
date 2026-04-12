@@ -24,6 +24,18 @@ These non-DLL assets are copied into `build-cef143/Debug/cef` after build:
 
 If a CEF package also includes `snapshot_blob.bin`, it will be copied there too.
 
+The copy is performed by CMake, not by a separate script.
+
+Specifically, `CMakeLists.txt` adds Windows `POST_BUILD` commands on the
+`ImGuiCefVulkan` target:
+
+- `cmake -E make_directory "$<TARGET_FILE_DIR:${PROJECT_NAME}>/cef"`
+- `cmake -E copy_directory "${CEF_ROOT}/Resources" "$<TARGET_FILE_DIR:${PROJECT_NAME}>/cef"`
+- `cmake -E copy_if_different ... "$<TARGET_FILE_DIR:${PROJECT_NAME}>/cef/..."`
+
+So the `cef` folder is created and populated as part of the normal build step for
+`Debug` and `Release`.
+
 ## DLLs
 
 The native DLLs are still staged in the build root, not in `Debug/cef`:

@@ -22,6 +22,46 @@ The application **builds and runs successfully** with complete browser functiona
 
 ## 🛠️ Build Instructions
 
+### Windows CEF Setup
+
+Download CEF binary distributions from:
+
+- `https://cef-builds.spotifycdn.com/index.html`
+
+Extract the Windows x64 package into the repo root. The extracted folder can keep
+its original versioned name, for example:
+
+- `cef_binary_133.4.8`
+- `cef_binary_143.0.14+gdd46a37+chromium-143.0.7499.193_windows64`
+
+This project chooses the CEF SDK with the `CEF_ROOT` CMake variable.
+
+If you do not set `CEF_ROOT`, the build defaults to the current local CEF 133
+folder:
+
+```powershell
+cmake -S . -B .\build -G "Visual Studio 17 2022" -A x64
+cmake --build .\build --config Debug
+```
+
+To build a different version, point `CEF_ROOT` at the extracted SDK and use a
+separate build directory:
+
+```powershell
+cmake -S . -B .\build-cef143 -G "Visual Studio 17 2022" -A x64 -DCEF_ROOT="C:\path\to\cef_binary_143.x.y_windows64"
+cmake --build .\build-cef143 --config Debug
+```
+
+Example using the local CEF 143 test folder:
+
+```powershell
+cmake -S . -B .\build-cef143 -G "Visual Studio 17 2022" -A x64 -DCEF_ROOT="C:\Users\leegr\dev\imguiCef\cef_binary_143.0.14+gdd46a37+chromium-143.0.7499.193_windows64"
+cmake --build .\build-cef143 --config Debug
+```
+
+This lets you keep multiple CEF versions side by side without replacing the
+current one.
+
 ### Prerequisites
 ```bash
 sudo apt install build-essential cmake git
