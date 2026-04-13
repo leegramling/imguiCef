@@ -6,8 +6,7 @@
 set -e  # Exit on any error
 
 # CEF Configuration - Update these variables to use different CEF versions
-CEF_VERSION="133.4.8+g99a2ab1+chromium-133.0.6943.142"
-CEF_DIR_NAME="cef_binary_133.4.8"
+CEF_VERSION="143.0.14+gdd46a37+chromium-143.0.7499.193"
 
 PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$PROJECT_ROOT"
@@ -29,6 +28,8 @@ else
     echo "Unsupported platform: $OSTYPE"
     exit 1
 fi
+
+CEF_DIR_NAME="cef_binary_${CEF_VERSION}_${CEF_PLATFORM}"
 
 echo "Detected platform: $PLATFORM"
 
@@ -55,11 +56,6 @@ download_cef() {
         echo "Extracting CEF..."
         tar -xjf "$CEF_FILENAME"
         rm "$CEF_FILENAME"
-        
-        # Rename to standard directory name
-        if [ -d "cef_binary_${CEF_VERSION}_${CEF_PLATFORM}" ]; then
-            mv "cef_binary_${CEF_VERSION}_${CEF_PLATFORM}" "$CEF_DIR_NAME"
-        fi
         
         echo "CEF downloaded and extracted to $CEF_DIR_NAME"
     else
@@ -185,13 +181,13 @@ setup_build() {
     echo "Configuring CMake..."
     case "$PLATFORM" in
         "linux64"|"macosx64")
-            cmake .. -DCMAKE_BUILD_TYPE=Debug
+            cmake .. -DCMAKE_BUILD_TYPE=Debug -DCEF_ROOT="$PROJECT_ROOT/$CEF_DIR_NAME"
             ;;
         "windows64")
             echo "On Windows, use Visual Studio or run:"
-            echo "cmake .. -G \"Visual Studio 16 2019\" -A x64"
+            echo "cmake .. -G \"Visual Studio 16 2019\" -A x64 -DCEF_ROOT=\"$PROJECT_ROOT/$CEF_DIR_NAME\""
             echo "or"
-            echo "cmake .. -G \"Visual Studio 17 2022\" -A x64"
+            echo "cmake .. -G \"Visual Studio 17 2022\" -A x64 -DCEF_ROOT=\"$PROJECT_ROOT/$CEF_DIR_NAME\""
             ;;
     esac
     
@@ -251,6 +247,7 @@ verify_setup() {
             echo "  make -j$(nproc 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || echo 4)"
             echo "  ./ImGuiCefVulkan"
         else
+            echo "  cmake .. -G \"Visual Studio 17 2022\" -A x64 -DCEF_ROOT=\"$PROJECT_ROOT/$CEF_DIR_NAME\""
             echo "  cmake --build . --config Debug"
             echo "  .\\Debug\\ImGuiCefVulkan.exe"
         fi
