@@ -12,6 +12,9 @@
 
 #ifdef _WIN32
 #include <windows.h>
+#else
+#include <unistd.h>
+#include <limits.h>
 #endif
 
 #define GLFW_INCLUDE_VULKAN
@@ -145,14 +148,14 @@ struct BrowserInstance {
     std::string name;
 
     void UpdateTexture(VulkanRenderer* renderer, VkSampler sampler) {
-        if (!renderHandler->IsDirty()) return;
+        if (!renderHandler || !renderHandler->IsDirty()) return;
         std::vector<uint8_t> data; int w, h;
         renderHandler->GetTextureData(data, w, h);
         if (textureImage == VK_NULL_HANDLE || w != width || h != height) {
             width = w; height = h;
             if (textureView) vkDestroyImageView(renderer->GetDevice(), textureView, nullptr);
             if (textureImage) { vkDestroyImage(renderer->GetDevice(), textureImage, nullptr); vkFreeMemory(renderer->GetDevice(), textureMemory, nullptr); }
-            textureImage = renderer->CreateTextureImage(width, height, data.data());
+            textureImage = renderer->CreateTextureImage(width, height, data.data(), textureMemory);
             textureView = renderer->CreateImageView(textureImage, VK_FORMAT_R8G8B8A8_UNORM);
             descriptorSet = ImGui_ImplVulkan_AddTexture(sampler, textureView, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
         } else renderer->UpdateTextureImage(textureImage, width, height, data.data());
@@ -181,9 +184,12 @@ private:
     BrowserInstance m_TodoApp;
     BrowserInstance m_PerfMon;
 
+    bool m_ShowTodo = false;
+    bool m_ShowPerf = true;
+
     bool InitializeCEF(int argc, char* argv[]);
     void CreateBrowser(BrowserInstance& instance, const std::string& url, CefMessageRouterBrowserSide::Handler* handler);
-    void RenderBrowserWindow(BrowserInstance& instance);
+    void RenderBrowserWindow(BrowserInstance& instance, bool* p_open, const std::string& url, CefMessageRouterBrowserSide::Handler* handler);
 };
 
 bool Application::Initialize(int argc, char* argv[]) {
@@ -215,12 +221,11 @@ bool Application::Initialize(int argc, char* argv[]) {
 #endif
 
     m_TodoApp.name = "TODO Application";
-    CreateBrowser(m_TodoApp, base_url + "todo.html", new TodoHandler());
+    // Browsers will be created on first open in RenderBrowserWindow
     
     m_PerfMon.name = "System Monitor";
     m_PerfMon.width = 500; m_PerfMon.height = 600;
-    CreateBrowser(m_PerfMon, base_url + "perf.html", new PerfHandler());
-
+    
     return true;
 }
 
@@ -233,16 +238,22 @@ bool Application::InitializeCEF(int argc, char* argv[]) {
     m_CefApp = new CefFormsApp();
     int ec = CefExecuteProcess(args, m_CefApp, nullptr);
     if (ec >= 0) exit(ec);
-    CefSettings s; s.windowless_rendering_enabled = true; s.no_sandbox = true;
+    
+    CefSettings s; 
+    s.windowless_rendering_enabled = true; 
+    s.no_sandbox = true;
+
+    auto root_dir = std::filesystem::current_path();
+
 #ifdef _WIN32
     auto exe_dir = GetExecutablePath().parent_path();
     SetCefPath(s.root_cache_path, exe_dir / "cef_cache");
     SetCefPath(s.resources_dir_path, exe_dir / "cef");
     SetCefPath(s.locales_dir_path, exe_dir / "cef" / "locales");
 #else
-    CefString(&s.root_cache_path).FromASCII("./cef_cache");
-    CefString(&s.locales_dir_path).FromASCII("./locales");
-    CefString(&s.resources_dir_path).FromASCII(".");
+    CefString(&s.root_cache_path).FromASCII(std::filesystem::absolute(root_dir / "cef_cache").string().c_str());
+    CefString(&s.locales_dir_path).FromASCII(std::filesystem::absolute(root_dir / "locales").string().c_str());
+    CefString(&s.resources_dir_path).FromASCII(std::filesystem::absolute(root_dir).string().c_str());
 #endif
     return CefInitialize(args, s, m_CefApp, nullptr);
 }
@@ -256,12 +267,19 @@ void Application::CreateBrowser(BrowserInstance& inst, const std::string& url, C
     CefBrowserHost::CreateBrowser(win, inst.client, url, bs, nullptr, nullptr);
 }
 
-void Application::RenderBrowserWindow(BrowserInstance& inst) {
+void Application::RenderBrowserWindow(BrowserInstance& inst, bool* p_open, const std::string& url, CefMessageRouterBrowserSide::Handler* handler) {
+    if (!*p_open) return;
+
+    // Lazy initialization
+    if (!inst.client) {
+        CreateBrowser(inst, url, handler);
+    }
+
     ImGui::SetNextWindowSize(ImVec2((float)inst.width + 20, (float)inst.height + 40), ImGuiCond_FirstUseEver);
-    if (ImGui::Begin(inst.name.c_str())) {
+    if (ImGui::Begin(inst.name.c_str(), p_open)) {
         ImVec2 avail = ImGui::GetContentRegionAvail();
         int aw = std::max(64, (int)avail.x), ah = std::max(64, (int)avail.y);
-        if (inst.client->GetBrowser() && (aw != inst.width || ah != inst.height)) {
+        if (inst.client->GetBrowser() && inst.client->GetBrowser()->GetHost() && (aw != inst.width || ah != inst.height)) {
             inst.width = aw; inst.height = ah;
             inst.renderHandler->Resize(aw, ah);
             inst.client->GetBrowser()->GetHost()->WasResized();
@@ -271,7 +289,7 @@ void Application::RenderBrowserWindow(BrowserInstance& inst) {
             ImGui::Image((ImTextureID)inst.descriptorSet, ImVec2((float)inst.width, (float)inst.height));
             ImGui::SetCursorScreenPos(cp);
             ImGui::InvisibleButton((inst.name + "_btn").c_str(), ImVec2((float)inst.width, (float)inst.height));
-            if (ImGui::IsItemHovered() && inst.client->GetBrowser()) {
+            if (ImGui::IsItemHovered() && inst.client->GetBrowser() && inst.client->GetBrowser()->GetHost()) {
                 auto h = inst.client->GetBrowser()->GetHost();
                 ImGuiIO& io = ImGui::GetIO(); ImVec2 m = ImGui::GetMousePos();
                 CefMouseEvent me; me.x = (int)(m.x - cp.x); me.y = (int)(m.y - cp.y); me.modifiers = 0;
@@ -291,15 +309,46 @@ void Application::RenderBrowserWindow(BrowserInstance& inst) {
 }
 
 void Application::Run() {
+    std::string base_url = "file://";
+#ifndef _WIN32
+    char buf[PATH_MAX]; getcwd(buf, sizeof(buf)); base_url += std::string(buf) + "/assets/";
+#else
+    base_url += GetExecutablePath().parent_path().string() + "/assets/";
+    std::replace(base_url.begin(), base_url.end(), '\\', '/');
+#endif
+
     while (!glfwWindowShouldClose(m_Window)) {
         glfwPollEvents();
         CefDoMessageLoopWork();
+        
         m_TodoApp.UpdateTexture(m_Renderer.get(), m_CefTextureSampler);
         m_PerfMon.UpdateTexture(m_Renderer.get(), m_CefTextureSampler);
+        
         m_Renderer->BeginFrame();
         ImGui_ImplVulkan_NewFrame(); ImGui_ImplGlfw_NewFrame(); ImGui::NewFrame();
-        RenderBrowserWindow(m_TodoApp);
-        RenderBrowserWindow(m_PerfMon);
+        
+        if (ImGui::BeginMainMenuBar()) {
+            if (ImGui::BeginMenu("File")) {
+                if (ImGui::MenuItem("Quit", "Alt+F4")) {
+                    glfwSetWindowShouldClose(m_Window, true);
+                }
+                ImGui::EndMenu();
+            }
+            if (ImGui::BeginMenu("Window")) {
+                ImGui::MenuItem("ToDo Application", nullptr, &m_ShowTodo);
+                ImGui::MenuItem("System Monitor", nullptr, &m_ShowPerf);
+                ImGui::EndMenu();
+            }
+            ImGui::EndMainMenuBar();
+        }
+
+        if (m_ShowTodo) {
+            RenderBrowserWindow(m_TodoApp, &m_ShowTodo, base_url + "todo.html", new TodoHandler());
+        }
+        if (m_ShowPerf) {
+            RenderBrowserWindow(m_PerfMon, &m_ShowPerf, base_url + "perf.html", new PerfHandler());
+        }
+        
         ImGui::Render();
         ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), m_Renderer->GetCommandBuffer());
         m_Renderer->EndFrame();
@@ -307,11 +356,16 @@ void Application::Run() {
 }
 
 void Application::Cleanup() {
-    vkDeviceWaitIdle(m_Renderer->GetDevice());
-    if (m_CefTextureSampler) vkDestroySampler(m_Renderer->GetDevice(), m_CefTextureSampler, nullptr);
-    m_TodoApp.Cleanup(m_Renderer->GetDevice()); m_PerfMon.Cleanup(m_Renderer->GetDevice());
-    ImGui_ImplVulkan_Shutdown(); ImGui_ImplGlfw_Shutdown(); ImGui::DestroyContext();
-    m_Renderer->Cleanup(); glfwDestroyWindow(m_Window); glfwTerminate();
+    if (m_Renderer) {
+        vkDeviceWaitIdle(m_Renderer->GetDevice());
+        if (m_CefTextureSampler) vkDestroySampler(m_Renderer->GetDevice(), m_CefTextureSampler, nullptr);
+        m_TodoApp.Cleanup(m_Renderer->GetDevice()); m_PerfMon.Cleanup(m_Renderer->GetDevice());
+        ImGui_ImplVulkan_Shutdown(); ImGui_ImplGlfw_Shutdown(); ImGui::DestroyContext();
+        m_Renderer->Cleanup(); 
+    }
+    if (m_Window) {
+        glfwDestroyWindow(m_Window); glfwTerminate();
+    }
     m_CefApp = nullptr; CefShutdown();
 }
 

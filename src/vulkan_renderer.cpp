@@ -66,8 +66,11 @@ void VulkanRenderer::BeginFrame() {
     renderPassInfo.renderPass = m_RenderPass;
     renderPassInfo.framebuffer = m_Framebuffers[m_ImageIndex];
     renderPassInfo.renderArea.offset = {0, 0};
-    renderPassInfo.renderArea.extent.width = 1280;
-    renderPassInfo.renderArea.extent.height = 720;
+    
+    int width, height;
+    glfwGetFramebufferSize(m_Window, &width, &height);
+    renderPassInfo.renderArea.extent.width = static_cast<uint32_t>(width);
+    renderPassInfo.renderArea.extent.height = static_cast<uint32_t>(height);
     
     VkClearValue clearColor = {{{0.0f, 0.0f, 0.0f, 1.0f}}};
     renderPassInfo.clearValueCount = 1;
@@ -199,13 +202,17 @@ bool VulkanRenderer::CreateSwapchain() {
     VkSurfaceCapabilitiesKHR capabilities;
     vkGetPhysicalDeviceSurfaceCapabilitiesKHR(m_PhysicalDevice, m_Surface, &capabilities);
     
+    int width, height;
+    glfwGetFramebufferSize(m_Window, &width, &height);
+    VkExtent2D extent = { static_cast<uint32_t>(width), static_cast<uint32_t>(height) };
+
     VkSwapchainCreateInfoKHR createInfo{};
     createInfo.sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR;
     createInfo.surface = m_Surface;
     createInfo.minImageCount = capabilities.minImageCount + 1;
     createInfo.imageFormat = VK_FORMAT_B8G8R8A8_UNORM;
     createInfo.imageColorSpace = VK_COLOR_SPACE_SRGB_NONLINEAR_KHR;
-    createInfo.imageExtent = {1280, 720};
+    createInfo.imageExtent = extent;
     createInfo.imageArrayLayers = 1;
     createInfo.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
     createInfo.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE;
@@ -291,6 +298,9 @@ bool VulkanRenderer::CreateRenderPass() {
 bool VulkanRenderer::CreateFramebuffers() {
     m_Framebuffers.resize(m_SwapchainImageViews.size());
     
+    int width, height;
+    glfwGetFramebufferSize(m_Window, &width, &height);
+
     for (size_t i = 0; i < m_SwapchainImageViews.size(); i++) {
         VkImageView attachments[] = { m_SwapchainImageViews[i] };
         
@@ -299,8 +309,8 @@ bool VulkanRenderer::CreateFramebuffers() {
         framebufferInfo.renderPass = m_RenderPass;
         framebufferInfo.attachmentCount = 1;
         framebufferInfo.pAttachments = attachments;
-        framebufferInfo.width = 1280;
-        framebufferInfo.height = 720;
+        framebufferInfo.width = static_cast<uint32_t>(width);
+        framebufferInfo.height = static_cast<uint32_t>(height);
         framebufferInfo.layers = 1;
         
         if (vkCreateFramebuffer(m_Device, &framebufferInfo, nullptr, &m_Framebuffers[i]) != VK_SUCCESS) {
@@ -372,7 +382,7 @@ bool VulkanRenderer::CreateSyncObjects() {
     return true;
 }
 
-VkImage VulkanRenderer::CreateTextureImage(uint32_t width, uint32_t height, const void* data) {
+VkImage VulkanRenderer::CreateTextureImage(uint32_t width, uint32_t height, const void* data, VkDeviceMemory& textureImageMemory) {
     VkDeviceSize imageSize = width * height * 4;
     
     VkBuffer stagingBuffer;
@@ -414,7 +424,6 @@ VkImage VulkanRenderer::CreateTextureImage(uint32_t width, uint32_t height, cons
     allocInfo.allocationSize = memRequirements.size;
     allocInfo.memoryTypeIndex = FindMemoryType(memRequirements.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
     
-    VkDeviceMemory textureImageMemory;
     if (vkAllocateMemory(m_Device, &allocInfo, nullptr, &textureImageMemory) != VK_SUCCESS) {
         vkDestroyImage(m_Device, textureImage, nullptr);
         return VK_NULL_HANDLE;

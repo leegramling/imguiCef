@@ -133,6 +133,8 @@ bool Application::InitializeCEF(int argc, char* argv[]) {
     settings.log_severity = LOGSEVERITY_INFO;
     settings.command_line_args_disabled = false;
 
+    auto root_dir = std::filesystem::current_path();
+
 #ifdef _WIN32
     const std::filesystem::path exe_dir = GetExecutablePath().parent_path();
     const std::filesystem::path build_dir = exe_dir.parent_path();
@@ -146,16 +148,10 @@ bool Application::InitializeCEF(int argc, char* argv[]) {
     SetCefPath(settings.resources_dir_path, cef_dir);
     SetCefPath(settings.locales_dir_path, cef_dir / "locales");
 #else
-    // On Linux, we need to set the resource paths - use current directory
-    // which should be the build directory when running.
-    CefString(&settings.root_cache_path).FromASCII("./cef_cache");
-    CefString(&settings.log_file).FromASCII("./debug.log");
-    CefString(&settings.locales_dir_path).FromASCII("./locales");
-    CefString(&settings.resources_dir_path).FromASCII(".");
-
-    // Debug: Print current working directory and check for required files.
-    std::cout << "Current working directory should contain CEF resources" << std::endl;
-    std::cout << "Looking for icudtl.dat, locales/, etc. in current directory" << std::endl;
+    CefString(&settings.root_cache_path).FromASCII(std::filesystem::absolute(root_dir / "cef_cache").string().c_str());
+    CefString(&settings.log_file).FromASCII(std::filesystem::absolute(root_dir / "debug.log").string().c_str());
+    CefString(&settings.locales_dir_path).FromASCII(std::filesystem::absolute(root_dir / "locales").string().c_str());
+    CefString(&settings.resources_dir_path).FromASCII(std::filesystem::absolute(root_dir).string().c_str());
 #endif
     
     // Initialize CEF
@@ -251,7 +247,7 @@ void Application::UpdateCefTexture() {
         }
         
         // Create new texture
-        m_CefTextureImage = m_Renderer->CreateTextureImage(width, height, textureData.data());
+        m_CefTextureImage = m_Renderer->CreateTextureImage(width, height, textureData.data(), m_CefTextureMemory);
         m_CefTextureView = m_Renderer->CreateImageView(m_CefTextureImage, VK_FORMAT_R8G8B8A8_UNORM);
         
         if (m_CefTextureSampler == VK_NULL_HANDLE) {

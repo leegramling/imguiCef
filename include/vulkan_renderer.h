@@ -20,7 +20,7 @@ public:
     VkDescriptorPool GetDescriptorPool() { return m_DescriptorPool; }
     uint32_t GetQueueFamily() { return m_QueueFamily; }
     
-    VkImage CreateTextureImage(uint32_t width, uint32_t height, const void* data);
+    VkImage CreateTextureImage(uint32_t width, uint32_t height, const void* data, VkDeviceMemory& textureMemory);
     void UpdateTextureImage(VkImage image, uint32_t width, uint32_t height, const void* data);
     VkImageView CreateImageView(VkImage image, VkFormat format);
     VkSampler CreateTextureSampler();
