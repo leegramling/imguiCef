@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CEF Todo App</title>
+    <style>
+        :root {
+            --primary: #4f46e5;
+            --primary-hover: #4338ca;
+            --bg: #f8fafc;
+            --card-bg: #ffffff;
+            --text-main: #1e293b;
+            --text-muted: #64748b;
+            --border: #e2e8f0;
+            --danger: #ef4444;
+            --success: #22c55e;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg);
+            color: var(--text-main);
+            margin: 0;
+            display: flex;
+            justify-content: center;
+            align-items: flex-start;
+            min-height: 100vh;
+            padding-top: 50px;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 500px;
+            background: var(--card-bg);
+            padding: 2rem;
+            border-radius: 12px;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+        }
+
+        h1 {
+            font-size: 1.875rem;
+            font-weight: 700;
+            margin-bottom: 1.5rem;
+            text-align: center;
+            color: var(--primary);
+        }
+
+        .input-group {
+            display: flex;
+            gap: 0.5rem;
+            margin-bottom: 2rem;
+        }
+
+        input[type="text"] {
+            flex: 1;
+            padding: 0.75rem 1rem;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+
+        input[type="text"]:focus {
+            border-color: var(--primary);
+        }
+
+        button.add-btn {
+            background-color: var(--primary);
+            color: white;
+            border: none;
+            padding: 0.75rem 1.5rem;
+            border-radius: 6px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+
+        button.add-btn:hover {
+            background-color: var(--primary-hover);
+        }
+
+        ul {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+
+        li {
+            display: flex;
+            align-items: center;
+            padding: 1rem;
+            border-bottom: 1px solid var(--border);
+            gap: 1rem;
+            transition: background-color 0.2s;
+        }
+
+        li:last-child {
+            border-bottom: none;
+        }
+
+        li:hover {
+            background-color: #f1f5f9;
+        }
+
+        .todo-text {
+            flex: 1;
+            font-size: 1rem;
+        }
+
+        .todo-text.completed {
+            text-decoration: line-through;
+            color: var(--text-muted);
+        }
+
+        .checkbox {
+            width: 1.25rem;
+            height: 1.25rem;
+            cursor: pointer;
+        }
+
+        .delete-btn {
+            background: none;
+            border: none;
+            color: var(--danger);
+            cursor: pointer;
+            font-size: 1.25rem;
+            padding: 0.25rem;
+            border-radius: 4px;
+            transition: background-color 0.2s;
+        }
+
+        .delete-btn:hover {
+            background-color: #fee2e2;
+        }
+
+        .empty-state {
+            text-align: center;
+            color: var(--text-muted);
+            margin-top: 2rem;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>My Tasks</h1>
+        <div class="input-group">
+            <input type="text" id="todo-input" placeholder="What needs to be done?">
+            <button class="add-btn" onclick="handleAdd()">Add Task</button>
+        </div>
+        <ul id="todo-list">
+            <!-- Todos will be rendered here -->
+        </ul>
+        <div id="empty-state" class="empty-state" style="display: none;">
+            No tasks yet. Add one above!
+        </div>
+    </div>
+
+    <script>
+        const input = document.getElementById('todo-input');
+        const list = document.getElementById('todo-list');
+        const emptyState = document.getElementById('empty-state');
+
+        input.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') handleAdd();
+        });
+
+        function handleAdd() {
+            const text = input.value.trim();
+            if (!text) return;
+
+            window.cefQuery({
+                request: JSON.stringify({ action: 'create', data: { text: text, completed: false } }),
+                onSuccess: function(response) {
+                    input.value = '';
+                    fetchTodos();
+                },
+                onFailure: function(code, msg) { console.error(msg); }
+            });
+        }
+
+        function toggleTodo(id, completed) {
+            window.cefQuery({
+                request: JSON.stringify({ action: 'update', data: { id: id, completed: !completed } }),
+                onSuccess: function(response) {
+                    fetchTodos();
+                }
+            });
+        }
+
+        function deleteTodo(id) {
+            window.cefQuery({
+                request: JSON.stringify({ action: 'delete', data: { id: id } }),
+                onSuccess: function(response) {
+                    fetchTodos();
+                }
+            });
+        }
+
+        function fetchTodos() {
+            if (typeof window.cefQuery === 'undefined') {
+                console.warn('CEF Query not available');
+                return;
+            }
+
+            window.cefQuery({
+                request: JSON.stringify({ action: 'read' }),
+                onSuccess: function(response) {
+                    const todos = JSON.parse(response);
+                    renderTodos(todos);
+                },
+                onFailure: function(code, msg) { console.error(msg); }
+            });
+        }
+
+        function renderTodos(todos) {
+            list.innerHTML = '';
+            if (todos.length === 0) {
+                emptyState.style.display = 'block';
+            } else {
+                emptyState.style.display = 'none';
+                todos.forEach(todo => {
+                    const li = document.createElement('li');
+                    li.innerHTML = `
+                        <input type="checkbox" class="checkbox" ${todo.completed ? 'checked' : ''} 
+                               onchange="toggleTodo(${todo.id}, ${todo.completed})">
+                        <span class="todo-text ${todo.completed ? 'completed' : ''}">${todo.text}</span>
+                        <button class="delete-btn" onclick="deleteTodo(${todo.id})">&times;</button>
+                    `;
+                    list.appendChild(li);
+                });
+            }
+        }
+
+        // Initial fetch
+        setTimeout(fetchTodos, 500); // Small delay to ensure CEF is ready
+    </script>
+</body>
+</html>

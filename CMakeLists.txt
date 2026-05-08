@@ -63,8 +63,7 @@ if(NOT EXISTS "${IMGUI_DIR}")
 endif()
 
 # Source files - USING FULL CEF INTEGRATION
-set(SOURCES
-    src/main.cpp
+set(COMMON_SOURCES
     src/vulkan_renderer.cpp
     src/cef_app.cpp
     src/cef_client.cpp
@@ -229,8 +228,16 @@ elseif(WIN32)
     endif()
 endif()
 
-# Create executable
-add_executable(${PROJECT_NAME} ${SOURCES} ${IMGUI_SOURCES})
+# Create executables
+set(TARGETS ImGuiCefVulkan cefForms)
+add_executable(ImGuiCefVulkan src/main.cpp ${COMMON_SOURCES} ${IMGUI_SOURCES})
+add_executable(cefForms 
+    src/cef_forms_main.cpp 
+    src/cef_forms_app.cpp 
+    src/cef_forms_client.cpp 
+    ${COMMON_SOURCES} 
+    ${IMGUI_SOURCES}
+)
 
 if(WIN32)
     set(CEF_RUNTIME_ASSET_FILES
@@ -241,138 +248,149 @@ if(WIN32)
     )
 endif()
 
-# Include directories
-target_include_directories(${PROJECT_NAME} PRIVATE
-    ${CMAKE_CURRENT_SOURCE_DIR}/include
-    ${CEF_INCLUDE_DIR}
-    ${IMGUI_DIR}
-    ${IMGUI_DIR}/backends
-    ${Vulkan_INCLUDE_DIRS}
-)
-
-# Link libraries
-target_link_libraries(${PROJECT_NAME} PRIVATE
-    cef_dll_wrapper
-    ${CEF_LIBRARIES}
-    ${Vulkan_LIBRARIES}
-    glfw
-    Threads::Threads
-)
-
-# Platform-specific libraries
-if(UNIX AND NOT APPLE)
-    # Linux-specific libraries
-    target_link_libraries(${PROJECT_NAME} PRIVATE dl X11)
-elseif(WIN32)
-    # Windows-specific libraries for CEF and system integration
-    target_link_libraries(${PROJECT_NAME} PRIVATE 
-        user32 gdi32 shell32 ole32 oleaut32 uuid winmm
-        advapi32 kernel32 ws2_32 psapi dbghelp comctl32
-        winspool comdlg32 odbc32 odbccp32 shlwapi propsys
+foreach(APP_TARGET ${TARGETS})
+    # Include directories
+    target_include_directories(${APP_TARGET} PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/include
+        ${CEF_INCLUDE_DIR}
+        ${IMGUI_DIR}
+        ${IMGUI_DIR}/backends
+        ${Vulkan_INCLUDE_DIRS}
     )
-endif()
 
-# Compile definitions
-target_compile_definitions(${PROJECT_NAME} PRIVATE
-    USING_CEF_SHARED
-    WRAPPING_CEF_SHARED
-)
-
-# Windows-specific compile definitions
-if(WIN32)
-    target_compile_definitions(${PROJECT_NAME} PRIVATE
-        WIN32_LEAN_AND_MEAN
-        NOMINMAX
-        _CRT_SECURE_NO_WARNINGS
-        _UNICODE
-        UNICODE
+    # Link libraries
+    target_link_libraries(${APP_TARGET} PRIVATE
+        cef_dll_wrapper
+        ${CEF_LIBRARIES}
+        ${Vulkan_LIBRARIES}
+        glfw
+        Threads::Threads
     )
-    
-    # MSVC-specific compiler flags
-    if(MSVC)
-        target_compile_options(${PROJECT_NAME} PRIVATE
-            /permissive-  # Conformance mode
-            /W3           # Warning level
-            /wd4996       # Disable deprecated function warnings
+
+    # Platform-specific libraries
+    if(UNIX AND NOT APPLE)
+        # Linux-specific libraries
+        target_link_libraries(${APP_TARGET} PRIVATE dl X11)
+    elseif(WIN32)
+        # Windows-specific libraries for CEF and system integration
+        target_link_libraries(${APP_TARGET} PRIVATE 
+            user32 gdi32 shell32 ole32 oleaut32 uuid winmm
+            advapi32 kernel32 ws2_32 psapi dbghelp comctl32
+            winspool comdlg32 odbc32 odbccp32 shlwapi propsys
         )
     endif()
 
-    # Stage non-DLL CEF runtime assets under the executable directory.
-    add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
-        COMMAND ${CMAKE_COMMAND} -E make_directory "$<TARGET_FILE_DIR:${PROJECT_NAME}>/cef"
-        COMMAND ${CMAKE_COMMAND} -E copy_directory "${CEF_ROOT}/Resources" "$<TARGET_FILE_DIR:${PROJECT_NAME}>/cef"
-        COMMENT "Copying CEF resource bundles to $<TARGET_FILE_DIR:${PROJECT_NAME}>/cef"
+    # Compile definitions
+    target_compile_definitions(${APP_TARGET} PRIVATE
+        USING_CEF_SHARED
+        WRAPPING_CEF_SHARED
     )
 
-    foreach(CEF_RUNTIME_ASSET_FILE ${CEF_RUNTIME_ASSET_FILES})
-        if(EXISTS "${CEF_BINARY_DIR}/${CEF_RUNTIME_ASSET_FILE}")
-            add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
-                COMMAND ${CMAKE_COMMAND} -E copy_if_different
-                    "${CEF_BINARY_DIR}/${CEF_RUNTIME_ASSET_FILE}"
-                    "$<TARGET_FILE_DIR:${PROJECT_NAME}>/cef/${CEF_RUNTIME_ASSET_FILE}"
-                COMMENT "Copying CEF asset ${CEF_RUNTIME_ASSET_FILE} to $<TARGET_FILE_DIR:${PROJECT_NAME}>/cef"
+    # Windows-specific compile definitions
+    if(WIN32)
+        target_compile_definitions(${APP_TARGET} PRIVATE
+            WIN32_LEAN_AND_MEAN
+            NOMINMAX
+            _CRT_SECURE_NO_WARNINGS
+            _UNICODE
+            UNICODE
+        )
+        
+        # MSVC-specific compiler flags
+        if(MSVC)
+            target_compile_options(${APP_TARGET} PRIVATE
+                /permissive-  # Conformance mode
+                /W3           # Warning level
+                /wd4996       # Disable deprecated function warnings
             )
         endif()
-    endforeach()
-endif()
 
-# Set RPATH for Linux to find CEF shared library
-if(UNIX AND NOT APPLE)
-    set_target_properties(${PROJECT_NAME} PROPERTIES
-        INSTALL_RPATH "$ORIGIN"
-        BUILD_WITH_INSTALL_RPATH TRUE
-    )
-endif()
+        # Stage non-DLL CEF runtime assets under the executable directory.
+        add_custom_command(TARGET ${APP_TARGET} POST_BUILD
+            COMMAND ${CMAKE_COMMAND} -E make_directory "$<TARGET_FILE_DIR:${APP_TARGET}>/cef"
+            COMMAND ${CMAKE_COMMAND} -E copy_directory "${CEF_ROOT}/Resources" "$<TARGET_FILE_DIR:${APP_TARGET}>/cef"
+            COMMENT "Copying CEF resource bundles to $<TARGET_FILE_DIR:${APP_TARGET}>/cef"
+        )
 
-# Windows-specific POST_BUILD commands to copy CEF files to executable directory
-if(WIN32 AND DEFINED CEF_COPY_FILES)
-    foreach(FILE ${CEF_COPY_FILES})
-        if(EXISTS "${FILE}")
-            get_filename_component(FILE_NAME ${FILE} NAME)
-            add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
-                COMMAND ${CMAKE_COMMAND} -E copy_if_different
-                "${FILE}"
-                "$<TARGET_FILE_DIR:${PROJECT_NAME}>/${FILE_NAME}"
-                COMMENT "Copying ${FILE_NAME} to executable directory"
-            )
-        endif()
-    endforeach()
-    
-    # Copy CEF resources to executable directory as well
-    add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
-        COMMAND ${CMAKE_COMMAND} -E copy_directory
-        "${CMAKE_BINARY_DIR}/locales"
-        "$<TARGET_FILE_DIR:${PROJECT_NAME}>/locales"
-        COMMENT "Copying locales directory to executable directory"
-    )
-    
-    # Copy essential resource files to executable directory
-    set(CEF_RESOURCE_FILES
-        "icudtl.dat"
-        "chrome_100_percent.pak"
-        "chrome_200_percent.pak"
-        "resources.pak"
-    )
-    
-    foreach(RESOURCE ${CEF_RESOURCE_FILES})
-        if(EXISTS "${CMAKE_BINARY_DIR}/${RESOURCE}")
-            add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
-                COMMAND ${CMAKE_COMMAND} -E copy_if_different
-                "${CMAKE_BINARY_DIR}/${RESOURCE}"
-                "$<TARGET_FILE_DIR:${PROJECT_NAME}>/${RESOURCE}"
-                COMMENT "Copying ${RESOURCE} to executable directory"
-            )
-        endif()
-    endforeach()
-endif()
+        foreach(CEF_RUNTIME_ASSET_FILE ${CEF_RUNTIME_ASSET_FILES})
+            if(EXISTS "${CEF_BINARY_DIR}/${CEF_RUNTIME_ASSET_FILE}")
+                add_custom_command(TARGET ${APP_TARGET} POST_BUILD
+                    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                        "${CEF_BINARY_DIR}/${CEF_RUNTIME_ASSET_FILE}"
+                        "$<TARGET_FILE_DIR:${APP_TARGET}>/cef/${CEF_RUNTIME_ASSET_FILE}"
+                    COMMENT "Copying CEF asset ${CEF_RUNTIME_ASSET_FILE} to $<TARGET_FILE_DIR:${APP_TARGET}>/cef"
+                )
+            endif()
+        endforeach()
+    endif()
 
-# On Linux, set executable permissions for chrome-sandbox if it exists
-if(UNIX AND NOT APPLE AND EXISTS "${CMAKE_BINARY_DIR}/chrome-sandbox")
-    add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
-        COMMAND chmod 4755 "${CMAKE_BINARY_DIR}/chrome-sandbox"
-        COMMENT "Setting chrome-sandbox permissions"
-    )
-endif()
+    # Set RPATH for Linux to find CEF shared library
+    if(UNIX AND NOT APPLE)
+        set_target_properties(${APP_TARGET} PROPERTIES
+            INSTALL_RPATH "$ORIGIN"
+            BUILD_WITH_INSTALL_RPATH TRUE
+        )
+    endif()
+
+    # Windows-specific POST_BUILD commands to copy CEF files to executable directory
+    if(WIN32 AND DEFINED CEF_COPY_FILES)
+        foreach(FILE ${CEF_COPY_FILES})
+            if(EXISTS "${FILE}")
+                get_filename_component(FILE_NAME ${FILE} NAME)
+                add_custom_command(TARGET ${APP_TARGET} POST_BUILD
+                    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                    "${FILE}"
+                    "$<TARGET_FILE_DIR:${APP_TARGET}>/${FILE_NAME}"
+                    COMMENT "Copying ${FILE_NAME} to executable directory"
+                )
+            endif()
+        endforeach()
+        
+        # Copy CEF resources to executable directory as well
+        add_custom_command(TARGET ${APP_TARGET} POST_BUILD
+            COMMAND ${CMAKE_COMMAND} -E copy_directory
+            "${CMAKE_BINARY_DIR}/locales"
+            "$<TARGET_FILE_DIR:${APP_TARGET}>/locales"
+            COMMENT "Copying locales directory to executable directory"
+        )
+        
+        # Copy essential resource files to executable directory
+        set(CEF_RESOURCE_FILES
+            "icudtl.dat"
+            "chrome_100_percent.pak"
+            "chrome_200_percent.pak"
+            "resources.pak"
+        )
+        
+        foreach(RESOURCE ${CEF_RESOURCE_FILES})
+            if(EXISTS "${CMAKE_BINARY_DIR}/${RESOURCE}")
+                add_custom_command(TARGET ${APP_TARGET} POST_BUILD
+                    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                    "${CMAKE_BINARY_DIR}/${RESOURCE}"
+                    "$<TARGET_FILE_DIR:${APP_TARGET}>/${RESOURCE}"
+                    COMMENT "Copying ${RESOURCE} to executable directory"
+                )
+            endif()
+        endforeach()
+    endif()
+
+    # On Linux, set executable permissions for chrome-sandbox if it exists
+    if(UNIX AND NOT APPLE AND EXISTS "${CMAKE_BINARY_DIR}/chrome-sandbox")
+        add_custom_command(TARGET ${APP_TARGET} POST_BUILD
+            COMMAND chmod 4755 "${CMAKE_BINARY_DIR}/chrome-sandbox"
+            COMMENT "Setting chrome-sandbox permissions"
+        )
+    endif()
+endforeach()
+
+# Copy assets folder to build directory ONLY for cefForms
+add_custom_command(TARGET cefForms POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_directory
+    "${CMAKE_CURRENT_SOURCE_DIR}/assets"
+    "$<TARGET_FILE_DIR:cefForms>/assets"
+    COMMENT "Copying assets directory to cefForms executable directory"
+)
+
 
 message(STATUS "CEF Root: ${CEF_ROOT}")
 message(STATUS "CEF Version: ${CEF_VERSION_STRING}")

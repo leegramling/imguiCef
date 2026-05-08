@@ -203,7 +203,7 @@ bool VulkanRenderer::CreateSwapchain() {
     createInfo.sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR;
     createInfo.surface = m_Surface;
     createInfo.minImageCount = capabilities.minImageCount + 1;
-    createInfo.imageFormat = VK_FORMAT_B8G8R8A8_SRGB;
+    createInfo.imageFormat = VK_FORMAT_B8G8R8A8_UNORM;
     createInfo.imageColorSpace = VK_COLOR_SPACE_SRGB_NONLINEAR_KHR;
     createInfo.imageExtent = {1280, 720};
     createInfo.imageArrayLayers = 1;
@@ -229,7 +229,7 @@ bool VulkanRenderer::CreateSwapchain() {
         viewInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
         viewInfo.image = m_SwapchainImages[i];
         viewInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
-        viewInfo.format = VK_FORMAT_B8G8R8A8_SRGB;
+        viewInfo.format = VK_FORMAT_B8G8R8A8_UNORM;
         viewInfo.components.r = VK_COMPONENT_SWIZZLE_IDENTITY;
         viewInfo.components.g = VK_COMPONENT_SWIZZLE_IDENTITY;
         viewInfo.components.b = VK_COMPONENT_SWIZZLE_IDENTITY;
@@ -250,7 +250,7 @@ bool VulkanRenderer::CreateSwapchain() {
 
 bool VulkanRenderer::CreateRenderPass() {
     VkAttachmentDescription colorAttachment{};
-    colorAttachment.format = VK_FORMAT_B8G8R8A8_SRGB;
+    colorAttachment.format = VK_FORMAT_B8G8R8A8_UNORM;
     colorAttachment.samples = VK_SAMPLE_COUNT_1_BIT;
     colorAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
     colorAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;

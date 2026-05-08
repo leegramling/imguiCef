@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>System Monitor</title>
+    <style>
+        :root {
+            --bg: #0f172a;
+            --card-bg: #1e293b;
+            --primary: #38bdf8;
+            --text-main: #f1f5f9;
+            --text-muted: #94a3b8;
+            --border: #334155;
+            --success: #22c55e;
+            --warning: #eab308;
+            --danger: #ef4444;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, sans-serif;
+            background-color: var(--bg);
+            color: var(--text-main);
+            margin: 0;
+            padding: 1rem;
+            overflow-x: hidden;
+        }
+
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1.5rem;
+        }
+
+        h1 {
+            font-size: 1.25rem;
+            margin: 0;
+            color: var(--primary);
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 1rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .stat-card {
+            background: var(--card-bg);
+            padding: 1rem;
+            border-radius: 8px;
+            border: 1px solid var(--border);
+        }
+
+        .stat-label {
+            font-size: 0.875rem;
+            color: var(--text-muted);
+            margin-bottom: 0.5rem;
+        }
+
+        .stat-value {
+            font-size: 1.5rem;
+            font-weight: 700;
+        }
+
+        .progress-bar {
+            height: 6px;
+            background: var(--border);
+            border-radius: 3px;
+            margin-top: 0.75rem;
+            overflow: hidden;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: var(--primary);
+            transition: width 0.5s ease;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            background: var(--card-bg);
+            border-radius: 8px;
+            overflow: hidden;
+            border: 1px solid var(--border);
+        }
+
+        th {
+            text-align: left;
+            padding: 0.75rem 1rem;
+            background: #111827;
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            color: var(--text-muted);
+            border-bottom: 1px solid var(--border);
+        }
+
+        td {
+            padding: 0.75rem 1rem;
+            font-size: 0.875rem;
+            border-bottom: 1px solid var(--border);
+        }
+
+        tr:last-child td {
+            border-bottom: none;
+        }
+
+        .usage-badge {
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-size: 0.75rem;
+            font-weight: 600;
+        }
+
+        .usage-low { color: var(--success); background: rgba(34, 197, 94, 0.1); }
+        .usage-med { color: var(--warning); background: rgba(234, 179, 8, 0.1); }
+        .usage-high { color: var(--danger); background: rgba(239, 68, 68, 0.1); }
+
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>Performance Monitor</h1>
+        <div id="uptime" style="font-size: 0.75rem; color: var(--text-muted);">Uptime: 00:00:00</div>
+    </div>
+
+    <div class="stats-grid">
+        <div class="stat-card">
+            <div class="stat-label">CPU Usage</div>
+            <div class="stat-value" id="cpu-total">0%</div>
+            <div class="progress-bar"><div id="cpu-bar" class="progress-fill" style="width: 0%"></div></div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-label">Memory Usage</div>
+            <div class="stat-value" id="mem-total">0.0 GB</div>
+            <div class="progress-bar"><div id="mem-bar" class="progress-fill" style="width: 0%"></div></div>
+        </div>
+    </div>
+
+    <table>
+        <thead>
+            <tr>
+                <th>Process</th>
+                <th>CPU %</th>
+                <th>Memory</th>
+                <th>Status</th>
+            </tr>
+        </thead>
+        <tbody id="process-list">
+            <!-- Rows injected by JS -->
+        </tbody>
+    </table>
+
+    <script>
+        function updateStats() {
+            if (typeof window.cefQuery === 'undefined') return;
+
+            window.cefQuery({
+                request: JSON.stringify({ action: 'get_stats' }),
+                onSuccess: function(response) {
+                    const stats = JSON.parse(response);
+                    
+                    // Update Globals
+                    document.getElementById('cpu-total').innerText = stats.cpu_total + '%';
+                    document.getElementById('cpu-bar').style.width = stats.cpu_total + '%';
+                    document.getElementById('mem-total').innerText = stats.mem_used_gb + ' GB';
+                    document.getElementById('mem-bar').style.width = stats.mem_percent + '%';
+                    document.getElementById('uptime').innerText = 'Uptime: ' + stats.uptime;
+
+                    // Update Table
+                    const tbody = document.getElementById('process-list');
+                    tbody.innerHTML = '';
+                    stats.processes.forEach(p => {
+                        const tr = document.createElement('tr');
+                        const usageClass = p.cpu > 50 ? 'usage-high' : (p.cpu > 20 ? 'usage-med' : 'usage-low');
+                        
+                        tr.innerHTML = `
+                            <td>${p.name}</td>
+                            <td><span class="usage-badge ${usageClass}">${p.cpu}%</span></td>
+                            <td>${p.mem} MB</td>
+                            <td style="color: var(--success)">Running</td>
+                        `;
+                        tbody.appendChild(tr);
+                    });
+                }
+            });
+        }
+
+        // Update every 1 second
+        setInterval(updateStats, 1000);
+        updateStats();
+    </script>
+</body>
+</html>
