@@ -40,6 +40,22 @@
 #include "../include/cef_forms_app.h"
 #include "../include/cef_forms_client.h"
 
+#ifdef TRACY_ENABLE
+#include <tracy/Tracy.hpp>
+void* operator new(std::size_t count) {
+    auto ptr = malloc(count);
+    TracyAlloc(ptr, count);
+    return ptr;
+}
+void operator delete(void* ptr) noexcept {
+    TracyFree(ptr);
+    free(ptr);
+}
+#else
+#define ZoneScoped
+#define FrameMark
+#endif
+
 // --- UTILS ---
 std::filesystem::path GetExecutablePath() {
 #ifdef _WIN32
@@ -386,13 +402,21 @@ bool Application::InitializeCEF(int argc, char* argv[]) {
     CefSettings s; s.windowless_rendering_enabled = true; s.no_sandbox = true;
     auto exe_dir = GetExecutablePath().parent_path();
 #ifdef _WIN32
+    const auto development_cef_dir = exe_dir / "cef";
+    const auto cef_dir = std::filesystem::exists(development_cef_dir / "resources.pak")
+        ? development_cef_dir
+        : exe_dir;
     SetCefPath(s.root_cache_path, exe_dir / "cef_cache");
-    SetCefPath(s.resources_dir_path, exe_dir / "cef");
-    SetCefPath(s.locales_dir_path, exe_dir / "cef" / "locales");
+    SetCefPath(s.resources_dir_path, cef_dir);
+    SetCefPath(s.locales_dir_path, cef_dir / "locales");
 #else
+    const auto development_cef_dir = exe_dir / "cef";
+    const auto cef_dir = std::filesystem::exists(development_cef_dir / "resources.pak")
+        ? development_cef_dir
+        : exe_dir;
     CefString(&s.root_cache_path).FromASCII((exe_dir / "cef_cache").string().c_str());
-    CefString(&s.locales_dir_path).FromASCII((exe_dir / "locales").string().c_str());
-    CefString(&s.resources_dir_path).FromASCII(exe_dir.string().c_str());
+    CefString(&s.locales_dir_path).FromASCII((cef_dir / "locales").string().c_str());
+    CefString(&s.resources_dir_path).FromASCII(cef_dir.string().c_str());
 #endif
     return CefInitialize(args, s, m_CefApp, nullptr);
 }
@@ -407,6 +431,7 @@ void Application::CreateBrowser(BrowserInstance& inst, const std::string& url, C
 }
 
 void Application::RenderBrowserWindow(BrowserInstance& inst, bool* p_open, const std::string& url, CefMessageRouterBrowserSide::Handler* handler) {
+    ZoneScoped;
     if (!*p_open) return;
     if (!inst.client) CreateBrowser(inst, url, handler);
     ImGui::SetNextWindowSize(ImVec2((float)inst.width + 20, (float)inst.height + 40), ImGuiCond_FirstUseEver);
@@ -444,6 +469,7 @@ void Application::RenderBrowserWindow(BrowserInstance& inst, bool* p_open, const
 }
 
 void Application::Run() {
+    ZoneScoped;
     std::string base_url = "file://";
 #ifndef _WIN32
     char buf[PATH_MAX]; getcwd(buf, sizeof(buf)); base_url += std::string(buf) + "/assets/";
@@ -453,6 +479,7 @@ void Application::Run() {
 #endif
 
     while (!glfwWindowShouldClose(m_Window)) {
+        FrameMark;
         glfwPollEvents();
         CefDoMessageLoopWork();
         

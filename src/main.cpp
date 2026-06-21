@@ -20,12 +20,20 @@
 
 #include "include/cef_app.h"
 #include "include/cef_browser.h"
+#include "include/cef_command_line.h"
 #include "include/wrapper/cef_helpers.h"
 #include "include/internal/cef_types.h"
 
 #include "../include/vulkan_renderer.h"
 #include "../include/cef_app_impl.h"
 #include "../include/cef_client_impl.h"
+
+#ifdef TRACY_ENABLE
+#include <tracy/Tracy.hpp>
+#else
+#define ZoneScoped
+#define FrameMark
+#endif
 
 #ifdef _WIN32
 namespace {
@@ -138,7 +146,11 @@ bool Application::InitializeCEF(int argc, char* argv[]) {
 #ifdef _WIN32
     const std::filesystem::path exe_dir = GetExecutablePath().parent_path();
     const std::filesystem::path build_dir = exe_dir.parent_path();
-    const std::filesystem::path cef_dir = exe_dir / "cef";
+    const std::filesystem::path development_cef_dir = exe_dir / "cef";
+    const std::filesystem::path cef_dir =
+        std::filesystem::exists(development_cef_dir / "resources.pak")
+        ? development_cef_dir
+        : exe_dir;
 
     // Keep DLLs in the build root while letting the executable live in Debug/Release.
     SetDllDirectoryW(build_dir.c_str());
@@ -148,10 +160,36 @@ bool Application::InitializeCEF(int argc, char* argv[]) {
     SetCefPath(settings.resources_dir_path, cef_dir);
     SetCefPath(settings.locales_dir_path, cef_dir / "locales");
 #else
+    CefRefPtr<CefCommandLine> command_line = CefCommandLine::CreateCommandLine();
+    command_line->InitFromArgv(argc, argv);
+
+    std::error_code executable_path_error;
+    const std::filesystem::path executable_path =
+        std::filesystem::read_symlink("/proc/self/exe", executable_path_error);
+    const std::filesystem::path executable_dir = executable_path_error
+        ? std::filesystem::absolute(root_dir)
+        : executable_path.parent_path();
+    const std::filesystem::path development_cef_dir = executable_dir / "cef";
+    const std::filesystem::path default_resources_dir =
+        std::filesystem::exists(development_cef_dir / "resources.pak")
+        ? development_cef_dir
+        : executable_dir;
+
+    const std::string resources_arg =
+        command_line->GetSwitchValue("resources-dir-path").ToString();
+    const std::string locales_arg =
+        command_line->GetSwitchValue("locales-dir-path").ToString();
+    const std::filesystem::path resources_dir = resources_arg.empty()
+        ? default_resources_dir
+        : std::filesystem::absolute(resources_arg);
+    const std::filesystem::path locales_dir = locales_arg.empty()
+        ? resources_dir / "locales"
+        : std::filesystem::absolute(locales_arg);
+
     CefString(&settings.root_cache_path).FromASCII(std::filesystem::absolute(root_dir / "cef_cache").string().c_str());
     CefString(&settings.log_file).FromASCII(std::filesystem::absolute(root_dir / "debug.log").string().c_str());
-    CefString(&settings.locales_dir_path).FromASCII(std::filesystem::absolute(root_dir / "locales").string().c_str());
-    CefString(&settings.resources_dir_path).FromASCII(std::filesystem::absolute(root_dir).string().c_str());
+    CefString(&settings.locales_dir_path).FromASCII(locales_dir.string().c_str());
+    CefString(&settings.resources_dir_path).FromASCII(resources_dir.string().c_str());
 #endif
     
     // Initialize CEF
@@ -224,6 +262,7 @@ void Application::CreateBrowser() {
 }
 
 void Application::UpdateCefTexture() {
+    ZoneScoped;
     if (!m_RenderHandler->IsDirty()) {
         return;
     }
@@ -375,12 +414,13 @@ void Application::RenderUI() {
 }
 
 void Application::Run() {
+    ZoneScoped;
     while (!glfwWindowShouldClose(m_Window)) {
+        FrameMark;
         glfwPollEvents();
-        
+
         // Process CEF events
         CefDoMessageLoopWork();
-        
         // Update CEF texture
         UpdateCefTexture();
         
