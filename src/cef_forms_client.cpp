@@ -1,5 +1,11 @@
 #include "../include/cef_forms_client.h"
 
+#ifdef TRACY_ENABLE
+#include <tracy/Tracy.hpp>
+#else
+#define ZoneScoped
+#endif
+
 CefFormsClient::CefFormsClient(CefRefPtr<CefRenderHandlerImpl> renderHandler)
     : CefClientImpl(renderHandler) {
     CefMessageRouterConfig config;
@@ -10,6 +16,7 @@ bool CefFormsClient::OnProcessMessageReceived(CefRefPtr<CefBrowser> browser,
                                             CefRefPtr<CefFrame> frame,
                                             CefProcessId source_process,
                                             CefRefPtr<CefProcessMessage> message) {
+    ZoneScoped;
     if (m_MessageRouter->OnProcessMessageReceived(browser, frame, source_process, message)) {
         return true;
     }

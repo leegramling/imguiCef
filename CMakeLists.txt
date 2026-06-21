@@ -6,6 +6,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 # Include FetchContent module for dependency management
 include(FetchContent)
+include(GNUInstallDirs)
 
 # Find system packages that cannot be fetched
 find_package(Vulkan REQUIRED)
@@ -18,12 +19,32 @@ FetchContent_Declare(
     GIT_TAG        3.3.8
 )
 
+# Fetch Tracy Profiler
+FetchContent_Declare(
+    tracy
+    GIT_REPOSITORY https://github.com/wolfpld/tracy.git
+    GIT_TAG        v0.10
+)
+
 # Configure GLFW options before fetching
 set(GLFW_BUILD_DOCS OFF CACHE BOOL "" FORCE)
 set(GLFW_BUILD_TESTS OFF CACHE BOOL "" FORCE)
 set(GLFW_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
+set(GLFW_INSTALL OFF CACHE BOOL "" FORCE)
+
+# Tracy options
+option(TRACY_ENABLE "Enable Tracy profiler" ON)
+set(TRACY_ON_DEMAND ON CACHE BOOL "" FORCE)
 
 FetchContent_MakeAvailable(glfw)
+
+# Tracy does not provide an install toggle. Adding it with EXCLUDE_FROM_ALL
+# keeps its development headers and static library out of this app's install.
+FetchContent_GetProperties(tracy)
+if(NOT tracy_POPULATED)
+    FetchContent_Populate(tracy)
+    add_subdirectory("${tracy_SOURCE_DIR}" "${tracy_BINARY_DIR}" EXCLUDE_FROM_ALL)
+endif()
 
 # CEF paths
 set(IMGUICEF_DEFAULT_CEF_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/cef_binary_133.4.8")
@@ -124,41 +145,52 @@ endif()
 if(UNIX AND NOT APPLE)
     # Linux
     set(CEF_BINARY_DIR "${CEF_ROOT}/Release")
-    set(CEF_LIBRARIES
-        "${CEF_BINARY_DIR}/libcef.so"
+    set(CEF_DEVELOPMENT_RUNTIME_DIR "${CMAKE_BINARY_DIR}/cef")
+
+    # Keep development builds small. CEF requires its core library, ICU data,
+    # V8 snapshot and resources in one runtime directory, so expose the binary
+    # distribution through symlinks instead of copying it beside each target.
+    set(CEF_LEGACY_BUILD_FILES
+        chrome-sandbox
+        chrome_100_percent.pak
+        chrome_200_percent.pak
+        icudtl.dat
+        libEGL.so
+        libGLESv2.so
+        libcef.so
+        libvk_swiftshader.so
+        libvulkan.so.1
+        resources.pak
+        snapshot_blob.bin
+        v8_context_snapshot.bin
+        vk_swiftshader_icd.json
     )
-    
-    # Copy CEF binaries to output directory
-    configure_file("${CEF_BINARY_DIR}/libcef.so" "${CMAKE_BINARY_DIR}/libcef.so" COPYONLY)
-    configure_file("${CEF_BINARY_DIR}/libGLESv2.so" "${CMAKE_BINARY_DIR}/libGLESv2.so" COPYONLY)
-    configure_file("${CEF_BINARY_DIR}/libEGL.so" "${CMAKE_BINARY_DIR}/libEGL.so" COPYONLY)
-    configure_file("${CEF_BINARY_DIR}/libvk_swiftshader.so" "${CMAKE_BINARY_DIR}/libvk_swiftshader.so" COPYONLY)
-    configure_file("${CEF_BINARY_DIR}/libvulkan.so.1" "${CMAKE_BINARY_DIR}/libvulkan.so.1" COPYONLY)
-    configure_file("${CEF_BINARY_DIR}/vk_swiftshader_icd.json" "${CMAKE_BINARY_DIR}/vk_swiftshader_icd.json" COPYONLY)
-    
-    # Copy V8 snapshot files (if they exist - newer CEF versions may not have snapshot_blob.bin)
-    if(EXISTS "${CEF_BINARY_DIR}/snapshot_blob.bin")
-        configure_file("${CEF_BINARY_DIR}/snapshot_blob.bin" "${CMAKE_BINARY_DIR}/snapshot_blob.bin" COPYONLY)
-    endif()
-    if(EXISTS "${CEF_BINARY_DIR}/v8_context_snapshot.bin")
-        configure_file("${CEF_BINARY_DIR}/v8_context_snapshot.bin" "${CMAKE_BINARY_DIR}/v8_context_snapshot.bin" COPYONLY)
-    endif()
-    
-    # Copy required CEF resources
-    message(STATUS "Copying CEF resources from: ${CEF_ROOT}/Resources/")
-    file(COPY "${CEF_ROOT}/Resources/" DESTINATION "${CMAKE_BINARY_DIR}/")
-    
-    # Verify icudtl.dat was copied
-    if(NOT EXISTS "${CMAKE_BINARY_DIR}/icudtl.dat")
-        message(WARNING "icudtl.dat not found in build directory after copy")
-    else()
-        message(STATUS "icudtl.dat successfully copied to build directory")
-    endif()
-    
-    # Copy additional binaries if they exist
-    if(EXISTS "${CEF_BINARY_DIR}/chrome-sandbox")
-        configure_file("${CEF_BINARY_DIR}/chrome-sandbox" "${CMAKE_BINARY_DIR}/chrome-sandbox" COPYONLY)
-    endif()
+    foreach(CEF_LEGACY_BUILD_FILE IN LISTS CEF_LEGACY_BUILD_FILES)
+        file(REMOVE "${CMAKE_BINARY_DIR}/${CEF_LEGACY_BUILD_FILE}")
+    endforeach()
+    file(REMOVE_RECURSE "${CMAKE_BINARY_DIR}/locales")
+
+    file(MAKE_DIRECTORY "${CEF_DEVELOPMENT_RUNTIME_DIR}")
+    file(GLOB CEF_DEVELOPMENT_BINARY_FILES LIST_DIRECTORIES FALSE
+        "${CEF_BINARY_DIR}/*"
+    )
+    file(GLOB CEF_DEVELOPMENT_RESOURCE_FILES LIST_DIRECTORIES FALSE
+        "${CEF_ROOT}/Resources/*"
+    )
+    foreach(CEF_RUNTIME_FILE IN LISTS
+            CEF_DEVELOPMENT_BINARY_FILES CEF_DEVELOPMENT_RESOURCE_FILES)
+        get_filename_component(CEF_RUNTIME_NAME "${CEF_RUNTIME_FILE}" NAME)
+        set(CEF_RUNTIME_LINK "${CEF_DEVELOPMENT_RUNTIME_DIR}/${CEF_RUNTIME_NAME}")
+        file(REMOVE "${CEF_RUNTIME_LINK}")
+        file(CREATE_LINK "${CEF_RUNTIME_FILE}" "${CEF_RUNTIME_LINK}" SYMBOLIC)
+    endforeach()
+    file(REMOVE "${CEF_DEVELOPMENT_RUNTIME_DIR}/locales")
+    file(CREATE_LINK
+        "${CEF_ROOT}/Resources/locales"
+        "${CEF_DEVELOPMENT_RUNTIME_DIR}/locales"
+        SYMBOLIC
+    )
+    set(CEF_LIBRARIES "${CEF_DEVELOPMENT_RUNTIME_DIR}/libcef.so")
     
 elseif(WIN32)
     # Windows - Set binary directory based on build configuration
@@ -216,16 +248,6 @@ elseif(WIN32)
         endif()
     endforeach()
     
-    # Copy CEF resources to build directory (these can stay in root)
-    message(STATUS "Copying CEF resources from: ${CEF_ROOT}/Resources/")
-    file(COPY "${CEF_ROOT}/Resources/" DESTINATION "${CMAKE_BINARY_DIR}/")
-    
-    # Verify icudtl.dat was copied
-    if(NOT EXISTS "${CMAKE_BINARY_DIR}/icudtl.dat")
-        message(WARNING "icudtl.dat not found in build directory after copy")
-    else()
-        message(STATUS "icudtl.dat successfully copied to build directory")
-    endif()
 endif()
 
 # Create executables
@@ -238,15 +260,6 @@ add_executable(cefForms
     ${COMMON_SOURCES} 
     ${IMGUI_SOURCES}
 )
-
-if(WIN32)
-    set(CEF_RUNTIME_ASSET_FILES
-        "icudtl.dat"
-        "vk_swiftshader_icd.json"
-        "snapshot_blob.bin"
-        "v8_context_snapshot.bin"
-    )
-endif()
 
 foreach(APP_TARGET ${TARGETS})
     # Include directories
@@ -266,6 +279,11 @@ foreach(APP_TARGET ${TARGETS})
         glfw
         Threads::Threads
     )
+
+    if(TRACY_ENABLE)
+        target_link_libraries(${APP_TARGET} PRIVATE Tracy::TracyClient)
+        target_compile_definitions(${APP_TARGET} PRIVATE TRACY_ENABLE)
+    endif()
 
     # Platform-specific libraries
     if(UNIX AND NOT APPLE)
@@ -305,30 +323,32 @@ foreach(APP_TARGET ${TARGETS})
             )
         endif()
 
-        # Stage non-DLL CEF runtime assets under the executable directory.
+        # Keep resource packs separate from the executable during development.
         add_custom_command(TARGET ${APP_TARGET} POST_BUILD
-            COMMAND ${CMAKE_COMMAND} -E make_directory "$<TARGET_FILE_DIR:${APP_TARGET}>/cef"
-            COMMAND ${CMAKE_COMMAND} -E copy_directory "${CEF_ROOT}/Resources" "$<TARGET_FILE_DIR:${APP_TARGET}>/cef"
+            COMMAND ${CMAKE_COMMAND} -E make_directory "$<TARGET_FILE_DIR:${APP_TARGET}>/cef/locales"
+            COMMAND ${CMAKE_COMMAND} -E copy_directory
+                "${CEF_ROOT}/Resources/locales"
+                "$<TARGET_FILE_DIR:${APP_TARGET}>/cef/locales"
             COMMENT "Copying CEF resource bundles to $<TARGET_FILE_DIR:${APP_TARGET}>/cef"
         )
 
-        foreach(CEF_RUNTIME_ASSET_FILE ${CEF_RUNTIME_ASSET_FILES})
-            if(EXISTS "${CEF_BINARY_DIR}/${CEF_RUNTIME_ASSET_FILE}")
-                add_custom_command(TARGET ${APP_TARGET} POST_BUILD
-                    COMMAND ${CMAKE_COMMAND} -E copy_if_different
-                        "${CEF_BINARY_DIR}/${CEF_RUNTIME_ASSET_FILE}"
-                        "$<TARGET_FILE_DIR:${APP_TARGET}>/cef/${CEF_RUNTIME_ASSET_FILE}"
-                    COMMENT "Copying CEF asset ${CEF_RUNTIME_ASSET_FILE} to $<TARGET_FILE_DIR:${APP_TARGET}>/cef"
-                )
-            endif()
+        foreach(CEF_RESOURCE_BUNDLE chrome_100_percent.pak chrome_200_percent.pak resources.pak)
+            add_custom_command(TARGET ${APP_TARGET} POST_BUILD
+                COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                    "${CEF_ROOT}/Resources/${CEF_RESOURCE_BUNDLE}"
+                    "$<TARGET_FILE_DIR:${APP_TARGET}>/cef/${CEF_RESOURCE_BUNDLE}"
+            )
         endforeach()
+
     endif()
 
     # Set RPATH for Linux to find CEF shared library
     if(UNIX AND NOT APPLE)
         set_target_properties(${APP_TARGET} PROPERTIES
+            BUILD_RPATH "$ORIGIN/cef"
+            BUILD_RPATH_USE_ORIGIN TRUE
             INSTALL_RPATH "$ORIGIN"
-            BUILD_WITH_INSTALL_RPATH TRUE
+            BUILD_WITH_INSTALL_RPATH FALSE
         )
     endif()
 
@@ -346,41 +366,15 @@ foreach(APP_TARGET ${TARGETS})
             endif()
         endforeach()
         
-        # Copy CEF resources to executable directory as well
+        # ICU must be available before application code can set CEF paths.
         add_custom_command(TARGET ${APP_TARGET} POST_BUILD
-            COMMAND ${CMAKE_COMMAND} -E copy_directory
-            "${CMAKE_BINARY_DIR}/locales"
-            "$<TARGET_FILE_DIR:${APP_TARGET}>/locales"
-            COMMENT "Copying locales directory to executable directory"
+            COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                "${CEF_ROOT}/Resources/icudtl.dat"
+                "$<TARGET_FILE_DIR:${APP_TARGET}>/icudtl.dat"
+            COMMENT "Copying CEF ICU data to executable directory"
         )
-        
-        # Copy essential resource files to executable directory
-        set(CEF_RESOURCE_FILES
-            "icudtl.dat"
-            "chrome_100_percent.pak"
-            "chrome_200_percent.pak"
-            "resources.pak"
-        )
-        
-        foreach(RESOURCE ${CEF_RESOURCE_FILES})
-            if(EXISTS "${CMAKE_BINARY_DIR}/${RESOURCE}")
-                add_custom_command(TARGET ${APP_TARGET} POST_BUILD
-                    COMMAND ${CMAKE_COMMAND} -E copy_if_different
-                    "${CMAKE_BINARY_DIR}/${RESOURCE}"
-                    "$<TARGET_FILE_DIR:${APP_TARGET}>/${RESOURCE}"
-                    COMMENT "Copying ${RESOURCE} to executable directory"
-                )
-            endif()
-        endforeach()
     endif()
 
-    # On Linux, set executable permissions for chrome-sandbox if it exists
-    if(UNIX AND NOT APPLE AND EXISTS "${CMAKE_BINARY_DIR}/chrome-sandbox")
-        add_custom_command(TARGET ${APP_TARGET} POST_BUILD
-            COMMAND chmod 4755 "${CMAKE_BINARY_DIR}/chrome-sandbox"
-            COMMENT "Setting chrome-sandbox permissions"
-        )
-    endif()
 endforeach()
 
 # Copy assets folder to build directory ONLY for cefForms
@@ -391,12 +385,58 @@ add_custom_command(TARGET cefForms POST_BUILD
     COMMENT "Copying assets directory to cefForms executable directory"
 )
 
+# Install a self-contained runtime. The executable and all CEF runtime files
+# share one directory so no build-tree paths or compile-time install flag are
+# required after relocation.
+install(TARGETS ${TARGETS}
+    RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}"
+)
+
+if(UNIX AND NOT APPLE)
+    set(CEF_INSTALL_BINARY_FILES ${CEF_DEVELOPMENT_BINARY_FILES})
+    list(REMOVE_ITEM CEF_INSTALL_BINARY_FILES "${CEF_BINARY_DIR}/chrome-sandbox")
+    install(FILES ${CEF_INSTALL_BINARY_FILES}
+        DESTINATION "${CMAKE_INSTALL_BINDIR}"
+    )
+    if(EXISTS "${CEF_BINARY_DIR}/chrome-sandbox")
+        install(PROGRAMS "${CEF_BINARY_DIR}/chrome-sandbox"
+            DESTINATION "${CMAKE_INSTALL_BINDIR}"
+        )
+    endif()
+    install(FILES ${CEF_DEVELOPMENT_RESOURCE_FILES}
+        DESTINATION "${CMAKE_INSTALL_BINDIR}"
+    )
+    install(DIRECTORY "${CEF_ROOT}/Resources/locales"
+        DESTINATION "${CMAKE_INSTALL_BINDIR}"
+    )
+elseif(WIN32)
+    install(FILES ${CEF_COPY_FILES}
+        DESTINATION "${CMAKE_INSTALL_BINDIR}"
+    )
+    install(FILES
+        "${CEF_ROOT}/Resources/icudtl.dat"
+        "${CEF_ROOT}/Resources/chrome_100_percent.pak"
+        "${CEF_ROOT}/Resources/chrome_200_percent.pak"
+        "${CEF_ROOT}/Resources/resources.pak"
+        DESTINATION "${CMAKE_INSTALL_BINDIR}"
+    )
+    install(DIRECTORY "${CEF_ROOT}/Resources/locales"
+        DESTINATION "${CMAKE_INSTALL_BINDIR}"
+    )
+endif()
+
+install(DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/assets"
+    DESTINATION "${CMAKE_INSTALL_BINDIR}"
+)
+
 
 message(STATUS "CEF Root: ${CEF_ROOT}")
 message(STATUS "CEF Version: ${CEF_VERSION_STRING}")
 message(STATUS "CEF Binary Dir: ${CEF_BINARY_DIR}")
 message(STATUS "Building with full CEF integration")
-message(STATUS "Make sure to run from build directory for proper resource loading")
+if(DEFINED CEF_DEVELOPMENT_RUNTIME_DIR)
+    message(STATUS "Development CEF runtime: ${CEF_DEVELOPMENT_RUNTIME_DIR}")
+endif()
 
 # Enable testing
 enable_testing()

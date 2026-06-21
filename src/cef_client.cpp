@@ -3,6 +3,12 @@
 #include <algorithm>
 #include <iostream>
 
+#ifdef TRACY_ENABLE
+#include <tracy/Tracy.hpp>
+#else
+#define ZoneScoped
+#endif
+
 // CefRenderHandlerImpl implementation
 CefRenderHandlerImpl::CefRenderHandlerImpl(int width, int height)
     : m_Width(width), m_Height(height), m_IsDirty(false) {
@@ -19,6 +25,7 @@ void CefRenderHandlerImpl::OnPaint(CefRefPtr<CefBrowser> browser,
                                    const RectList& dirtyRects,
                                    const void* buffer,
                                    int width, int height) {
+    ZoneScoped;
     std::lock_guard<std::mutex> lock(m_Mutex);
     
     if (width != m_Width || height != m_Height) {

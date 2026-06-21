@@ -13,9 +13,9 @@ echo "=== ImGuiCef Windows Setup ==="
 echo "Project root: $PROJECT_ROOT"
 
 # CEF version configuration
-CEF_VERSION="105.3.39+g0bb4138+chromium-105.0.5195.127"
-CEF_DIR_NAME="cef_binary_105.3.39"
+CEF_VERSION="143.0.14+gdd46a37+chromium-143.0.7499.193"
 CEF_PLATFORM="windows64"
+CEF_DIR_NAME="cef_binary_${CEF_VERSION}_${CEF_PLATFORM}"
 
 # Detect Windows environment
 detect_environment() {
@@ -148,11 +148,6 @@ download_cef() {
         # Clean up downloaded file
         rm "$cef_filename"
         
-        # Rename to standard directory name if needed
-        if [ -d "cef_binary_${CEF_VERSION}_${CEF_PLATFORM}" ]; then
-            mv "cef_binary_${CEF_VERSION}_${CEF_PLATFORM}" "$CEF_DIR_NAME"
-        fi
-        
         echo "✓ CEF downloaded and extracted to $CEF_DIR_NAME"
     else
         echo "✓ CEF already exists at $CEF_DIR_NAME"
@@ -199,60 +194,74 @@ setup_vs_environment() {
 # Function to create Windows batch files for building
 create_build_scripts() {
     echo "=== Creating Build Scripts ==="
+
+    local cmake_generator
+    if [[ "$VS_VERSION" == *"2022"* ]]; then
+        cmake_generator="Visual Studio 17 2022"
+    else
+        cmake_generator="Visual Studio 16 2019"
+    fi
     
     # Create build.bat
     cat > build.bat << 'EOF'
 @echo off
+setlocal
 echo Setting up Visual Studio environment...
 call "%VCVARS_PATH%"
+if errorlevel 1 exit /b %errorlevel%
 
-echo Creating build directory...
-if not exist build mkdir build
-cd build
+cd /d "%~dp0"
+
+set "CONFIG=%~1"
+if not defined CONFIG set "CONFIG=Debug"
+set "CEF_ROOT=%~dp0%CEF_DIR_NAME%"
 
 echo Configuring with CMake...
-cmake .. -G "Visual Studio 17 2022" -A x64 || cmake .. -G "Visual Studio 16 2019" -A x64
+cmake -S . -B build -G "%CMAKE_GENERATOR%" -A x64 -DCEF_ROOT="%CEF_ROOT%"
 
-if %ERRORLEVEL% neq 0 (
+if errorlevel 1 (
     echo CMake configuration failed!
-    pause
     exit /b 1
 )
 
-echo Configuration complete. You can now build with:
-echo   cmake --build . --config Debug
-echo   cmake --build . --config Release
-pause
+echo Building %CONFIG% configuration...
+cmake --build build --config "%CONFIG%"
+if errorlevel 1 exit /b 1
+
+if /I "%~2"=="install" (
+    echo Installing %CONFIG% configuration...
+    if "%~3"=="" (
+        cmake --install build --config "%CONFIG%"
+    ) else (
+        cmake --install build --config "%CONFIG%" --prefix "%~3"
+    )
+    if errorlevel 1 exit /b 1
+)
+
+echo Build completed successfully.
 EOF
     
-    # Set the vcvars path in the batch file
+    # Set paths and generator in the batch file.
     sed -i "s|%VCVARS_PATH%|$VCVARS_WIN_PATH|g" build.bat
+    sed -i "s|%CEF_DIR_NAME%|$CEF_DIR_NAME|g" build.bat
+    sed -i "s|%CMAKE_GENERATOR%|$cmake_generator|g" build.bat
     
     # Create build-and-run.bat
     cat > build-and-run.bat << 'EOF'
 @echo off
-echo Setting up Visual Studio environment...
-call "%VCVARS_PATH%"
-
-cd build
-
-echo Building Debug configuration...
-cmake --build . --config Debug
-
-if %ERRORLEVEL% neq 0 (
+setlocal
+cd /d "%~dp0"
+call build.bat Debug
+if errorlevel 1 (
     echo Build failed!
-    pause
     exit /b 1
 )
 
 echo Build successful! Running application...
-Debug\ImGuiCefVulkan.exe
+build\Debug\ImGuiCefVulkan.exe
 
 pause
 EOF
-    
-    # Set the vcvars path in the batch file
-    sed -i "s|%VCVARS_PATH%|$VCVARS_WIN_PATH|g" build-and-run.bat
     
     echo "✓ Created build.bat and build-and-run.bat"
 }
@@ -268,7 +277,7 @@ configure_cmake() {
     echo "Attempting CMake configuration..."
     
     if [[ "$VS_VERSION" == *"2022"* ]]; then
-        if cmake .. -G "Visual Studio 17 2022" -A x64; then
+        if cmake .. -G "Visual Studio 17 2022" -A x64 -DCEF_ROOT="$PROJECT_ROOT/$CEF_DIR_NAME"; then
             echo "✓ CMake configured successfully with Visual Studio 2022"
         else
             echo "✗ CMake configuration failed"
@@ -276,7 +285,7 @@ configure_cmake() {
             return 1
         fi
     else
-        if cmake .. -G "Visual Studio 16 2019" -A x64; then
+        if cmake .. -G "Visual Studio 16 2019" -A x64 -DCEF_ROOT="$PROJECT_ROOT/$CEF_DIR_NAME"; then
             echo "✓ CMake configured successfully with Visual Studio 2019"
         else
             echo "✗ CMake configuration failed"
@@ -336,7 +345,9 @@ verify_setup() {
         echo "   start build/ImGuiCefVulkan.sln"
         echo ""
         echo "2. Or build from command line:"
-        echo "   build.bat                    # Configure only"
+        echo "   build.bat [Debug^|Release]    # Configure and build"
+        echo "   build.bat Release install    # Configure, build, and install"
+        echo "   build.bat Release install C:\path\to\prefix"
         echo "   build-and-run.bat           # Build and run"
         echo ""
         echo "3. Or use CMake directly:"

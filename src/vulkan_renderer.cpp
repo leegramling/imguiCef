@@ -2,6 +2,13 @@
 #include <iostream>
 #include <cstring>
 
+#ifdef TRACY_ENABLE
+#include <tracy/Tracy.hpp>
+#include <tracy/TracyVulkan.hpp>
+#else
+#define ZoneScoped
+#endif
+
 bool VulkanRenderer::Initialize(GLFWwindow* window) {
     m_Window = window;
     
@@ -82,6 +89,7 @@ void VulkanRenderer::BeginFrame() {
 }
 
 void VulkanRenderer::EndFrame() {
+    ZoneScoped;
     vkCmdEndRenderPass(m_CommandBuffer);
     vkEndCommandBuffer(m_CommandBuffer);
     
@@ -525,6 +533,7 @@ VkImage VulkanRenderer::CreateTextureImage(uint32_t width, uint32_t height, cons
 }
 
 void VulkanRenderer::UpdateTextureImage(VkImage image, uint32_t width, uint32_t height, const void* data) {
+    ZoneScoped;
     if (image == VK_NULL_HANDLE) return;
     VkDeviceSize imageSize = (VkDeviceSize)width * height * 4;
     

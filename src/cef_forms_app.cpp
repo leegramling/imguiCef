@@ -1,8 +1,15 @@
 #include "../include/cef_forms_app.h"
 
+#ifdef TRACY_ENABLE
+#include <tracy/Tracy.hpp>
+#else
+#define ZoneScoped
+#endif
+
 void CefFormsApp::OnContextCreated(CefRefPtr<CefBrowser> browser,
                                   CefRefPtr<CefFrame> frame,
                                   CefRefPtr<CefV8Context> context) {
+    ZoneScoped;
     if (!m_MessageRouter) {
         CefMessageRouterConfig config;
         m_MessageRouter = CefMessageRouterRendererSide::Create(config);

@@ -75,8 +75,10 @@ target_compile_definitions(test_cef_initialize PRIVATE
 # Set RPATH for Linux to find CEF shared library
 if(UNIX AND NOT APPLE)
     set_target_properties(test_cef_initialize PROPERTIES
-        INSTALL_RPATH "$ORIGIN/../"
-        BUILD_WITH_INSTALL_RPATH TRUE
+        BUILD_RPATH "$ORIGIN/../cef"
+        BUILD_RPATH_USE_ORIGIN TRUE
+        INSTALL_RPATH "$ORIGIN"
+        BUILD_WITH_INSTALL_RPATH FALSE
     )
 endif()
 
@@ -87,7 +89,7 @@ add_test(NAME CEFInitializeTest COMMAND test_cef_initialize)
 if(UNIX AND NOT APPLE)
     # Linux: Use LD_LIBRARY_PATH
     set_tests_properties(CEFInitializeTest PROPERTIES
-        ENVIRONMENT "LD_LIBRARY_PATH=${CMAKE_BINARY_DIR}:$ENV{LD_LIBRARY_PATH}"
+        ENVIRONMENT "LD_LIBRARY_PATH=${CMAKE_BINARY_DIR}/cef:$ENV{LD_LIBRARY_PATH}"
     )
 elseif(WIN32)
     # Windows: Use PATH
