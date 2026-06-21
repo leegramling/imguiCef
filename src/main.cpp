@@ -6,6 +6,7 @@
 #include <thread>
 #include <chrono>
 #include <filesystem>
+#include <optional>
 
 #ifdef _WIN32
 #include <windows.h>
@@ -33,6 +34,29 @@ std::filesystem::path GetExecutablePath() {
     std::wstring buffer(MAX_PATH, L'\0');
     DWORD length = GetModuleFileNameW(nullptr, buffer.data(), static_cast<DWORD>(buffer.size()));
     buffer.resize(length);
+    return std::filesystem::path(buffer);
+}
+
+std::optional<std::filesystem::path> GetEnvironmentPath(const wchar_t* name) {
+    DWORD required = GetEnvironmentVariableW(name, nullptr, 0);
+    if (required == 0) {
+        return std::nullopt;
+    }
+
+    std::wstring buffer(required, L'\0');
+    DWORD written = GetEnvironmentVariableW(name, buffer.data(), required);
+    if (written == 0) {
+        return std::nullopt;
+    }
+
+    if (!buffer.empty() && buffer.back() == L'\0') {
+        buffer.pop_back();
+    }
+
+    if (buffer.empty()) {
+        return std::nullopt;
+    }
+
     return std::filesystem::path(buffer);
 }
 
@@ -138,7 +162,11 @@ bool Application::InitializeCEF(int argc, char* argv[]) {
 #ifdef _WIN32
     const std::filesystem::path exe_dir = GetExecutablePath().parent_path();
     const std::filesystem::path build_dir = exe_dir.parent_path();
-    const std::filesystem::path cef_dir = exe_dir / "cef";
+    const std::filesystem::path default_cef_dir = exe_dir / "cef";
+    const std::filesystem::path cef_dir =
+        GetEnvironmentPath(L"IMGUICEF_CEF_RESOURCES_DIR").value_or(default_cef_dir);
+    const std::filesystem::path locales_dir =
+        GetEnvironmentPath(L"IMGUICEF_CEF_LOCALES_DIR").value_or(cef_dir / "locales");
 
     // Keep DLLs in the build root while letting the executable live in Debug/Release.
     SetDllDirectoryW(build_dir.c_str());
@@ -146,7 +174,7 @@ bool Application::InitializeCEF(int argc, char* argv[]) {
     SetCefPath(settings.root_cache_path, exe_dir / "cef_cache");
     SetCefPath(settings.log_file, exe_dir / "debug.log");
     SetCefPath(settings.resources_dir_path, cef_dir);
-    SetCefPath(settings.locales_dir_path, cef_dir / "locales");
+    SetCefPath(settings.locales_dir_path, locales_dir);
 #else
     CefString(&settings.root_cache_path).FromASCII(std::filesystem::absolute(root_dir / "cef_cache").string().c_str());
     CefString(&settings.log_file).FromASCII(std::filesystem::absolute(root_dir / "debug.log").string().c_str());
