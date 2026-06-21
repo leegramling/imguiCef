@@ -7,6 +7,11 @@ void CefAppImpl::OnContextInitialized() {
 
 void CefAppImpl::OnBeforeCommandLineProcessing(const CefString& process_type,
                                                CefRefPtr<CefCommandLine> command_line) {
-    // Intentionally leave GPU-related flags under caller control so Chromium
-    // can honor real command-line switches passed to the executable.
+#if defined(__linux__)
+    // The Chromium zygote can fail to handshake in WSL, which prevents the GPU
+    // process from launching and causes CEF to abort after repeated retries.
+    if (process_type.empty() && !command_line->HasSwitch("no-zygote")) {
+        command_line->AppendSwitch("no-zygote");
+    }
+#endif
 }
