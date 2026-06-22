@@ -11,7 +11,12 @@
 
 // CefRenderHandlerImpl implementation
 CefRenderHandlerImpl::CefRenderHandlerImpl(int width, int height)
-    : m_Width(width), m_Height(height), m_IsDirty(false) {
+    : m_Width(width),
+      m_Height(height),
+      m_IsDirty(false),
+      m_PaintFps(0.0),
+      m_PaintSamples(0),
+      m_LastPaintSample(std::chrono::steady_clock::now()) {
     m_Buffer.resize(width * height * 4);
 }
 
@@ -37,6 +42,17 @@ void CefRenderHandlerImpl::OnPaint(CefRefPtr<CefBrowser> browser,
     // Copy the entire buffer (BGRA format)
     std::memcpy(m_Buffer.data(), buffer, width * height * 4);
     m_IsDirty = true;
+
+    if (type == PET_VIEW) {
+        ++m_PaintSamples;
+        const auto now = std::chrono::steady_clock::now();
+        const std::chrono::duration<double> elapsed = now - m_LastPaintSample;
+        if (elapsed.count() >= 0.5) {
+            m_PaintFps = static_cast<double>(m_PaintSamples) / elapsed.count();
+            m_PaintSamples = 0;
+            m_LastPaintSample = now;
+        }
+    }
 }
 
 void CefRenderHandlerImpl::GetTextureData(std::vector<uint8_t>& data, int& width, int& height) {
@@ -53,6 +69,11 @@ void CefRenderHandlerImpl::GetTextureData(std::vector<uint8_t>& data, int& width
         data[i + 2] = m_Buffer[i];     // B
         data[i + 3] = m_Buffer[i + 3]; // A
     }
+}
+
+double CefRenderHandlerImpl::GetPaintFps() const {
+    std::lock_guard<std::mutex> lock(m_Mutex);
+    return m_PaintFps;
 }
 
 void CefRenderHandlerImpl::Resize(int width, int height) {

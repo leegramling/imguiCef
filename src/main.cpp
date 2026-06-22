@@ -98,6 +98,12 @@ private:
     int m_BrowserWidth = 800;
     int m_BrowserHeight = 600;
     char m_UrlBuffer[256] = "https://www.google.com";
+    double m_VulkanFps = 0.0;
+    int m_FrameSamples = 0;
+    std::chrono::steady_clock::time_point m_LastFpsSample = std::chrono::steady_clock::now();
+    double m_BeginFrameFps = 0.0;
+    int m_BeginFrameSamples = 0;
+    std::chrono::steady_clock::time_point m_LastBeginFrameSample = std::chrono::steady_clock::now();
     
     bool InitializeCEF(int argc, char* argv[]);
     bool InitializeWindow();
@@ -113,6 +119,12 @@ bool Application::Initialize(int argc, char* argv[]) {
     for (int i = 1; i < argc; ++i) {
         if (std::strcmp(argv[i], "--gpu-test") == 0) {
             std::strncpy(m_UrlBuffer, "chrome://gpu", sizeof(m_UrlBuffer) - 1);
+            m_UrlBuffer[sizeof(m_UrlBuffer) - 1] = '\0';
+            break;
+        }
+
+        if (std::strcmp(argv[i], "--motionmark") == 0) {
+            std::strncpy(m_UrlBuffer, "https://browserbench.org/MotionMark1.3.2/", sizeof(m_UrlBuffer) - 1);
             m_UrlBuffer[sizeof(m_UrlBuffer) - 1] = '\0';
             break;
         }
@@ -280,6 +292,7 @@ void Application::CreateBrowser() {
     // Configure browser window info
     CefWindowInfo window_info;
     window_info.SetAsWindowless(0);
+    window_info.external_begin_frame_enabled = true;
     
     // Configure browser settings
     CefBrowserSettings browser_settings;
@@ -335,6 +348,27 @@ void Application::UpdateCefTexture() {
 void Application::RenderUI() {
     // Single browser window with controls at the top
     ImGui::Begin("Browser", nullptr, ImGuiWindowFlags_NoCollapse);
+
+    if (m_VulkanFps > 0.0) {
+        ImGui::Text("Vulkan loop: %.1f FPS (%.2f ms/frame)", m_VulkanFps, 1000.0 / m_VulkanFps);
+    } else {
+        ImGui::Text("Vulkan loop: measuring...");
+    }
+
+    if (m_BeginFrameFps > 0.0) {
+        ImGui::Text("CEF begin frame: %.1f FPS (%.2f ms/frame)", m_BeginFrameFps, 1000.0 / m_BeginFrameFps);
+    } else {
+        ImGui::Text("CEF begin frame: measuring...");
+    }
+
+    if (m_RenderHandler) {
+        const double paint_fps = m_RenderHandler->GetPaintFps();
+        if (paint_fps > 0.0) {
+            ImGui::Text("CEF OnPaint: %.1f FPS (%.2f ms/frame)", paint_fps, 1000.0 / paint_fps);
+        } else {
+            ImGui::Text("CEF OnPaint: measuring...");
+        }
+    }
     
     // URL controls at the top
     ImGui::Text("URL:");
@@ -444,8 +478,20 @@ void Application::RenderUI() {
 void Application::Run() {
     ZoneScoped;
     while (!glfwWindowShouldClose(m_Window)) {
+        const auto frame_start = std::chrono::steady_clock::now();
         FrameMark;
         glfwPollEvents();
+
+        if (m_Client && m_Client->GetBrowser()) {
+            m_Client->GetBrowser()->GetHost()->SendExternalBeginFrame();
+            ++m_BeginFrameSamples;
+            const std::chrono::duration<double> begin_elapsed = frame_start - m_LastBeginFrameSample;
+            if (begin_elapsed.count() >= 0.5) {
+                m_BeginFrameFps = static_cast<double>(m_BeginFrameSamples) / begin_elapsed.count();
+                m_BeginFrameSamples = 0;
+                m_LastBeginFrameSample = frame_start;
+            }
+        }
 
         // Process CEF events
         CefDoMessageLoopWork();
@@ -469,6 +515,14 @@ void Application::Run() {
         
         // End frame
         m_Renderer->EndFrame();
+
+        ++m_FrameSamples;
+        const std::chrono::duration<double> elapsed = frame_start - m_LastFpsSample;
+        if (elapsed.count() >= 0.5) {
+            m_VulkanFps = static_cast<double>(m_FrameSamples) / elapsed.count();
+            m_FrameSamples = 0;
+            m_LastFpsSample = frame_start;
+        }
     }
 }
 

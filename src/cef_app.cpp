@@ -38,6 +38,15 @@ void CefAppImpl::OnContextInitialized() {
 
 void CefAppImpl::OnBeforeCommandLineProcessing(const CefString& process_type,
                                                CefRefPtr<CefCommandLine> command_line) {
+    if (process_type.empty() && !command_line->HasSwitch("show-fps-counter")) {
+        command_line->AppendSwitch("show-fps-counter");
+    }
+
+    if (process_type.empty() && command_line->HasSwitch("unlimited-fps")) {
+        command_line->AppendSwitch("disable-frame-rate-limit");
+        command_line->AppendSwitch("disable-gpu-vsync");
+    }
+
 #ifdef _WIN32
     if (auto resources_dir = GetEnvironmentString(L"IMGUICEF_CEF_RESOURCES_DIR")) {
         command_line->AppendSwitchWithValue("resources-dir-path", *resources_dir);
