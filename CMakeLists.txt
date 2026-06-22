@@ -324,21 +324,26 @@ foreach(APP_TARGET ${TARGETS})
         endif()
 
         # Keep resource packs separate from the executable during development.
-        add_custom_command(TARGET ${APP_TARGET} POST_BUILD
+        # An explicit dependency also stages them when an existing executable
+        # does not need to be relinked after CMake changes.
+        add_custom_target(${APP_TARGET}_cef_resources
             COMMAND ${CMAKE_COMMAND} -E make_directory "$<TARGET_FILE_DIR:${APP_TARGET}>/cef/locales"
             COMMAND ${CMAKE_COMMAND} -E copy_directory
                 "${CEF_ROOT}/Resources/locales"
                 "$<TARGET_FILE_DIR:${APP_TARGET}>/cef/locales"
-            COMMENT "Copying CEF resource bundles to $<TARGET_FILE_DIR:${APP_TARGET}>/cef"
+            COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                "${CEF_ROOT}/Resources/chrome_100_percent.pak"
+                "$<TARGET_FILE_DIR:${APP_TARGET}>/cef/chrome_100_percent.pak"
+            COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                "${CEF_ROOT}/Resources/chrome_200_percent.pak"
+                "$<TARGET_FILE_DIR:${APP_TARGET}>/cef/chrome_200_percent.pak"
+            COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                "${CEF_ROOT}/Resources/resources.pak"
+                "$<TARGET_FILE_DIR:${APP_TARGET}>/cef/resources.pak"
+            COMMENT "Staging CEF resource bundles in $<TARGET_FILE_DIR:${APP_TARGET}>/cef"
+            VERBATIM
         )
-
-        foreach(CEF_RESOURCE_BUNDLE chrome_100_percent.pak chrome_200_percent.pak resources.pak)
-            add_custom_command(TARGET ${APP_TARGET} POST_BUILD
-                COMMAND ${CMAKE_COMMAND} -E copy_if_different
-                    "${CEF_ROOT}/Resources/${CEF_RESOURCE_BUNDLE}"
-                    "$<TARGET_FILE_DIR:${APP_TARGET}>/cef/${CEF_RESOURCE_BUNDLE}"
-            )
-        endforeach()
+        add_dependencies(${APP_TARGET} ${APP_TARGET}_cef_resources)
 
     endif()
 
