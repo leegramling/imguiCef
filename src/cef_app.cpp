@@ -2,6 +2,7 @@
 #include <iostream>
 
 #ifdef _WIN32
+#include <filesystem>
 #include <optional>
 #include <string>
 #include <windows.h>
@@ -29,6 +30,14 @@ std::optional<std::wstring> GetEnvironmentString(const wchar_t* name) {
 
     return buffer;
 }
+
+std::filesystem::path GetExecutableDirectory() {
+    std::wstring buffer(MAX_PATH, L'\0');
+    DWORD length = GetModuleFileNameW(nullptr, buffer.data(),
+                                     static_cast<DWORD>(buffer.size()));
+    buffer.resize(length);
+    return std::filesystem::path(buffer).parent_path();
+}
 }  // namespace
 #endif
 
@@ -48,13 +57,23 @@ void CefAppImpl::OnBeforeCommandLineProcessing(const CefString& process_type,
     }
 
 #ifdef _WIN32
-    if (auto resources_dir = GetEnvironmentString(L"IMGUICEF_CEF_RESOURCES_DIR")) {
-        command_line->AppendSwitchWithValue("resources-dir-path", *resources_dir);
-    }
+    const std::filesystem::path executable_dir = GetExecutableDirectory();
+    const std::filesystem::path development_cef_dir = executable_dir / "cef";
+    const std::filesystem::path default_resources_dir =
+        std::filesystem::exists(development_cef_dir / "resources.pak")
+            ? development_cef_dir
+            : executable_dir;
+    const std::filesystem::path resources_dir =
+        GetEnvironmentString(L"IMGUICEF_CEF_RESOURCES_DIR")
+            .value_or(default_resources_dir.wstring());
+    const std::filesystem::path locales_dir =
+        GetEnvironmentString(L"IMGUICEF_CEF_LOCALES_DIR")
+            .value_or((resources_dir / "locales").wstring());
 
-    if (auto locales_dir = GetEnvironmentString(L"IMGUICEF_CEF_LOCALES_DIR")) {
-        command_line->AppendSwitchWithValue("locales-dir-path", *locales_dir);
-    }
+    // CefSettings applies to the browser process. Explicit switches ensure the
+    // renderer and GPU subprocesses use the same development resource layout.
+    command_line->AppendSwitchWithValue("resources-dir-path", resources_dir.wstring());
+    command_line->AppendSwitchWithValue("locales-dir-path", locales_dir.wstring());
 #endif
 
 #if defined(__linux__)
