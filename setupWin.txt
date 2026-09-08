@@ -13,7 +13,7 @@ echo "=== ImGuiCef Windows Setup ==="
 echo "Project root: $PROJECT_ROOT"
 
 # CEF version configuration
-CEF_VERSION="143.0.14+gdd46a37+chromium-143.0.7499.193"
+CEF_VERSION="152.0.6+g708dc14+chromium-152.0.7977.83"
 CEF_PLATFORM="windows64"
 CEF_DIR_NAME="cef_binary_${CEF_VERSION}_${CEF_PLATFORM}"
 

@@ -128,8 +128,8 @@ if "%SELECTED_CEF_ROOT%"=="" (
         set "SELECTED_CEF_ROOT=%%~fD"
     )
 )
-if "%SELECTED_CEF_ROOT%"=="" if exist "%SOURCE_DIR%\cef_binary_133.4.8" (
-    set "SELECTED_CEF_ROOT=%SOURCE_DIR%\cef_binary_133.4.8"
+if "%SELECTED_CEF_ROOT%"=="" if exist "%SOURCE_DIR%\cef_binary_152.0.6+g708dc14+chromium-152.0.7977.83_windows64" (
+    set "SELECTED_CEF_ROOT=%SOURCE_DIR%\cef_binary_152.0.6+g708dc14+chromium-152.0.7977.83_windows64"
 )
 
 if "%SELECTED_CEF_ROOT%"=="" (

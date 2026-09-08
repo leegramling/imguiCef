@@ -1,6 +1,7 @@
 #include <iostream>
 #include <cassert>
 #include <chrono>
+#include <filesystem>
 #include <thread>
 
 #ifdef _WIN32
@@ -22,17 +23,20 @@ public:
         CefRefPtr<CefCommandLine> command_line) override {
         
         // Disable GPU and graphics-related features for headless testing
-        command_line->AppendSwitch("--disable-gpu");
-        command_line->AppendSwitch("--disable-gpu-compositing");
-        command_line->AppendSwitch("--disable-gpu-sandbox");
-        command_line->AppendSwitch("--disable-software-rasterizer");
-        command_line->AppendSwitch("--headless");
-        command_line->AppendSwitch("--no-sandbox");
-        command_line->AppendSwitch("--disable-dev-shm-usage");
-        command_line->AppendSwitch("--disable-extensions");
-        command_line->AppendSwitch("--disable-plugins");
-        command_line->AppendSwitch("--disable-web-security");
-        command_line->AppendSwitch("--disable-features=VizDisplayCompositor");
+        command_line->AppendSwitch("disable-gpu");
+        command_line->AppendSwitch("disable-gpu-compositing");
+        command_line->AppendSwitch("disable-gpu-sandbox");
+        command_line->AppendSwitch("disable-software-rasterizer");
+        command_line->AppendSwitch("headless");
+        command_line->AppendSwitch("no-sandbox");
+        command_line->AppendSwitch("disable-dev-shm-usage");
+        command_line->AppendSwitch("disable-extensions");
+        command_line->AppendSwitch("disable-plugins");
+        command_line->AppendSwitch("disable-web-security");
+        command_line->AppendSwitchWithValue("disable-features", "VizDisplayCompositor");
+#if defined(__linux__)
+        command_line->AppendSwitch("no-zygote");
+#endif
     }
 
 private:
@@ -65,6 +69,11 @@ int main(int argc, char* argv[]) {
     settings.windowless_rendering_enabled = false;  // We don't need windowless rendering for this test
     settings.no_sandbox = true;                     // Disable sandbox for testing
     settings.log_severity = LOGSEVERITY_INFO;       // Enable logging for debugging
+
+    const auto root_cache_path = std::filesystem::absolute("cef_test_cache");
+    const auto cache_path = root_cache_path / "Default";
+    CefString(&settings.root_cache_path).FromString(root_cache_path.string());
+    CefString(&settings.cache_path).FromString(cache_path.string());
     
     // Set log file path (optional)
     CefString(&settings.log_file).FromASCII("cef_test.log");

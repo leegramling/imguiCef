@@ -1,13 +1,29 @@
 #include "../include/cef_app_impl.h"
 #include <iostream>
+#include <string>
 
 #ifdef _WIN32
 #include <filesystem>
 #include <optional>
-#include <string>
 #include <windows.h>
+#endif
 
 namespace {
+void AppendFeatureSwitch(CefRefPtr<CefCommandLine> command_line,
+                         const std::string& feature_name) {
+    std::string features = command_line->GetSwitchValue("enable-features").ToString();
+    if (features.find(feature_name) != std::string::npos) {
+        return;
+    }
+
+    if (!features.empty()) {
+        features += ",";
+    }
+    features += feature_name;
+    command_line->AppendSwitchWithValue("enable-features", features);
+}
+
+#ifdef _WIN32
 std::optional<std::wstring> GetEnvironmentString(const wchar_t* name) {
     DWORD required = GetEnvironmentVariableW(name, nullptr, 0);
     if (required == 0) {
@@ -38,8 +54,8 @@ std::filesystem::path GetExecutableDirectory() {
     buffer.resize(length);
     return std::filesystem::path(buffer).parent_path();
 }
-}  // namespace
 #endif
+}  // namespace
 
 void CefAppImpl::OnContextInitialized() {
     std::cout << "CEF context initialized" << std::endl;
@@ -55,6 +71,15 @@ void CefAppImpl::OnBeforeCommandLineProcessing(const CefString& process_type,
         command_line->AppendSwitch("disable-frame-rate-limit");
         command_line->AppendSwitch("disable-gpu-vsync");
     }
+
+    if (!command_line->HasSwitch("use-vulkan")) {
+        command_line->AppendSwitch("use-vulkan");
+    }
+    if (!command_line->HasSwitch("use-angle")) {
+        command_line->AppendSwitchWithValue("use-angle", "vulkan");
+    }
+    AppendFeatureSwitch(command_line, "Vulkan");
+    AppendFeatureSwitch(command_line, "VulkanFromANGLE");
 
 #ifdef _WIN32
     const std::filesystem::path executable_dir = GetExecutableDirectory();

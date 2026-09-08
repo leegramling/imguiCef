@@ -407,6 +407,7 @@ bool Application::InitializeCEF(int argc, char* argv[]) {
         ? development_cef_dir
         : exe_dir;
     SetCefPath(s.root_cache_path, exe_dir / "cef_cache");
+    SetCefPath(s.log_file, exe_dir / "cef_debug.log");
     SetCefPath(s.resources_dir_path, cef_dir);
     SetCefPath(s.locales_dir_path, cef_dir / "locales");
 #else
@@ -415,6 +416,7 @@ bool Application::InitializeCEF(int argc, char* argv[]) {
         ? development_cef_dir
         : exe_dir;
     CefString(&s.root_cache_path).FromASCII((exe_dir / "cef_cache").string().c_str());
+    CefString(&s.log_file).FromASCII((exe_dir / "cef_debug.log").string().c_str());
     CefString(&s.locales_dir_path).FromASCII((cef_dir / "locales").string().c_str());
     CefString(&s.resources_dir_path).FromASCII(cef_dir.string().c_str());
 #endif

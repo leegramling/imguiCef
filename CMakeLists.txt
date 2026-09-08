@@ -47,7 +47,29 @@ if(NOT tracy_POPULATED)
 endif()
 
 # CEF paths
-set(IMGUICEF_DEFAULT_CEF_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/cef_binary_133.4.8")
+if(WIN32)
+    set(IMGUICEF_DEFAULT_CEF_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/cef_binary_152.0.6+g708dc14+chromium-152.0.7977.83_windows64")
+    set(IMGUICEF_CEF_PLATFORM_SUFFIX "windows64")
+elseif(UNIX AND NOT APPLE)
+    set(IMGUICEF_DEFAULT_CEF_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/cef_binary_152.0.6+g708dc14+chromium-152.0.7977.83_linux64")
+    set(IMGUICEF_CEF_PLATFORM_SUFFIX "linux64")
+elseif(APPLE)
+    set(IMGUICEF_DEFAULT_CEF_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/cef_binary_152.0.6+g708dc14+chromium-152.0.7977.83_macosx64")
+    set(IMGUICEF_CEF_PLATFORM_SUFFIX "macosx64")
+else()
+    set(IMGUICEF_DEFAULT_CEF_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/cef_binary_152.0.6+g708dc14+chromium-152.0.7977.83_windows64")
+    set(IMGUICEF_CEF_PLATFORM_SUFFIX "windows64")
+endif()
+if(NOT EXISTS "${IMGUICEF_DEFAULT_CEF_ROOT}/include/cef_version.h")
+    file(GLOB IMGUICEF_PLATFORM_CEF_ROOTS LIST_DIRECTORIES TRUE
+        "${CMAKE_CURRENT_SOURCE_DIR}/cef_binary_*_${IMGUICEF_CEF_PLATFORM_SUFFIX}"
+    )
+    if(IMGUICEF_PLATFORM_CEF_ROOTS)
+        list(SORT IMGUICEF_PLATFORM_CEF_ROOTS)
+        list(REVERSE IMGUICEF_PLATFORM_CEF_ROOTS)
+        list(GET IMGUICEF_PLATFORM_CEF_ROOTS 0 IMGUICEF_DEFAULT_CEF_ROOT)
+    endif()
+endif()
 set(CEF_ROOT "${IMGUICEF_DEFAULT_CEF_ROOT}" CACHE PATH "Path to the CEF binary distribution root")
 set(CEF_INCLUDE_DIR "${CEF_ROOT}/include")
 set(CEF_LIBCEF_DLL_DIR "${CEF_ROOT}/libcef_dll")
@@ -221,32 +243,14 @@ elseif(WIN32)
         message(STATUS "CEF sandbox disabled for easier development")
     endif()
     
-    # Use POST_BUILD commands to copy files to the correct output directory
-    # This ensures files go to Debug/ or Release/ subdirectory on Windows
-    set(CEF_COPY_FILES
-        "${CEF_BINARY_DIR}/libcef.dll"
+    # Stage the runtime sidecar files shipped with the selected CEF binary.
+    # Newer CEF builds add/remove DLLs, so glob by file type instead of naming
+    # each dependency manually.
+    file(GLOB CEF_COPY_FILES LIST_DIRECTORIES FALSE
+        "${CEF_BINARY_DIR}/*.dll"
+        "${CEF_BINARY_DIR}/*.bin"
+        "${CEF_BINARY_DIR}/*.json"
     )
-    
-    # Add all DLLs from CEF binary directory
-    file(GLOB CEF_DLLS "${CEF_BINARY_DIR}/*.dll")
-    list(APPEND CEF_COPY_FILES ${CEF_DLLS})
-    
-    # Add additional Windows-specific CEF files
-    set(CEF_ADDITIONAL_FILES
-        "d3dcompiler_47.dll"
-        "libEGL.dll" 
-        "libGLESv2.dll"
-        "vulkan-1.dll"
-        "vk_swiftshader_icd.json"
-        "snapshot_blob.bin"
-        "v8_context_snapshot.bin"
-    )
-    
-    foreach(FILE ${CEF_ADDITIONAL_FILES})
-        if(EXISTS "${CEF_BINARY_DIR}/${FILE}")
-            list(APPEND CEF_COPY_FILES "${CEF_BINARY_DIR}/${FILE}")
-        endif()
-    endforeach()
     
 endif()
 
@@ -264,8 +268,9 @@ add_executable(cefForms
 foreach(APP_TARGET ${TARGETS})
     # Include directories
     target_include_directories(${APP_TARGET} PRIVATE
-        ${CMAKE_CURRENT_SOURCE_DIR}/include
+        ${CEF_ROOT}
         ${CEF_INCLUDE_DIR}
+        ${CMAKE_CURRENT_SOURCE_DIR}/include
         ${IMGUI_DIR}
         ${IMGUI_DIR}/backends
         ${Vulkan_INCLUDE_DIRS}

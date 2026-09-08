@@ -196,7 +196,7 @@ bool Application::InitializeCEF(int argc, char* argv[]) {
     SetDllDirectoryW(build_dir.c_str());
 
     SetCefPath(settings.root_cache_path, exe_dir / "cef_cache");
-    SetCefPath(settings.log_file, exe_dir / "debug.log");
+    SetCefPath(settings.log_file, exe_dir / "cef_debug.log");
     SetCefPath(settings.resources_dir_path, cef_dir);
     SetCefPath(settings.locales_dir_path, locales_dir);
 #else
@@ -227,7 +227,7 @@ bool Application::InitializeCEF(int argc, char* argv[]) {
         : std::filesystem::absolute(locales_arg);
 
     CefString(&settings.root_cache_path).FromASCII(std::filesystem::absolute(root_dir / "cef_cache").string().c_str());
-    CefString(&settings.log_file).FromASCII(std::filesystem::absolute(root_dir / "debug.log").string().c_str());
+    CefString(&settings.log_file).FromASCII((executable_dir / "cef_debug.log").string().c_str());
     CefString(&settings.locales_dir_path).FromASCII(locales_dir.string().c_str());
     CefString(&settings.resources_dir_path).FromASCII(resources_dir.string().c_str());
 #endif

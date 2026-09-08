@@ -6,7 +6,7 @@
 set -e  # Exit on any error
 
 # CEF Configuration - Update these variables to use different CEF versions
-CEF_VERSION="143.0.14+gdd46a37+chromium-143.0.7499.193"
+CEF_VERSION="152.0.6+g708dc14+chromium-152.0.7977.83"
 
 PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$PROJECT_ROOT"
