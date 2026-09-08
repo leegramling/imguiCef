@@ -4,6 +4,7 @@
 #include "include/cef_render_handler.h"
 #include "include/cef_life_span_handler.h"
 #include <chrono>
+#include <cstdint>
 #include <mutex>
 #include <vector>
 
@@ -18,6 +19,10 @@ public:
                         const RectList& dirtyRects,
                         const void* buffer,
                         int width, int height) override;
+    virtual void OnAcceleratedPaint(CefRefPtr<CefBrowser> browser,
+                                   PaintElementType type,
+                                   const RectList& dirtyRects,
+                                   const CefAcceleratedPaintInfo& info) override;
     
     // Custom methods
     void GetTextureData(std::vector<uint8_t>& data, int& width, int& height);
@@ -34,6 +39,8 @@ private:
     bool m_IsDirty;
     double m_PaintFps;
     int m_PaintSamples;
+    uint64_t m_AcceleratedPaintFrames;
+    bool m_LoggedAcceleratedFallback;
     std::chrono::steady_clock::time_point m_LastPaintSample;
     
     IMPLEMENT_REFCOUNTING(CefRenderHandlerImpl);

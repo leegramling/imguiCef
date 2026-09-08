@@ -292,6 +292,7 @@ void Application::CreateBrowser() {
     // Configure browser window info
     CefWindowInfo window_info;
     window_info.SetAsWindowless(0);
+    window_info.shared_texture_enabled = true;
     window_info.external_begin_frame_enabled = true;
     
     // Configure browser settings

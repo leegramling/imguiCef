@@ -428,6 +428,7 @@ void Application::CreateBrowser(BrowserInstance& inst, const std::string& url, C
     inst.client = new CefFormsClient(inst.renderHandler);
     if (handler) inst.client->AddMessageHandler(handler);
     CefWindowInfo win; win.SetAsWindowless(0);
+    win.shared_texture_enabled = true;
     CefBrowserSettings bs; bs.windowless_frame_rate = 60;
     CefBrowserHost::CreateBrowser(win, inst.client, url, bs, nullptr, nullptr);
 }
